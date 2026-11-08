@@ -1,0 +1,11 @@
+# Instructions for AI tools in this repo
+- Business logic lives only in `server/src/core` as pure functions: no DB, no fs, no `Date.now()` (pass time in).
+- Every core function gets a Vitest test, written before or with the code.
+- Never fill in or guess missing data. A gap is "unknown".
+- Never convert units silently. Keep `original_value` and `original_unit`. Unit is a per-logger setting, confirmed by a human.
+- Fridge identity is branch + fridge, not the logger id.
+- Do not filter short spikes out of the inspector report; label them.
+- Minimal dependencies. Explain any new one in DECISIONS.md.
+- Record every new decision in DECISIONS.md and every AI mistake in AI_LOG.md.
+- Keep routes thin. Keep UI strings in `client/src/strings.ts`.
+- Mobile first: check layouts at 375px width.
