@@ -1,8 +1,13 @@
 # AI_LOG
 Format: date | tool | what it proposed | what I did | how I caught it | where in repo
 
-2026-11-08 | Gemini | Said Haifa numbers are "10x higher", normalize by /10 | Rejected: it is Fahrenheit (38.3 F ~ 3.5 C). /10 gives 3.83, plausible but wrong | Converted by hand and compared with other branches | test `units.test.ts` (Fahrenheit), D3
+2026-11-08 | Gemini | Said Haifa numbers are "10x higher", normalize by /10 | Rejected: it is Fahrenheit (38.3 F = 3.5 C). /10 gives 3.83, plausible but wrong | Converted by hand and compared with other branches | test `server/src/core/units.test.ts` (committed alone, failing first), D3
 2026-11-08 | Claude | Auto-detect and convert Fahrenheit silently | Changed to suggest + one-time human confirm per logger (GPT review) | 38.3 C is possible in a broken fridge | D3, preview/confirm flow
-2026-11-08 | GPT | Four layers API/Service/Repository/Import | Rejected as premature for 48h; kept only pure core vs rest | Time budget, "few decisions made well" | CLAUDE.md, D15
+2026-11-08 | GPT | Four layers API/Service/Repository/Import; Prisma; MUI | Rejected as premature for 48h; kept only pure core vs the rest | Time budget, "few decisions made well" | CLAUDE.md, D15
 2026-11-08 | Claude | Too many features | Cut scope, ordered by priority | Assignment text | INIT.md section 6
 2026-11-08 | Claude | Claimed offline/no-CDN was a requirement | Corrected: only "no accounts, no paid services" | Re-read assignment | NOTES.md
+2026-11-08 | Claude Code | Wrote exact version facts into DECISIONS D18 ("vitest 4.1.12", "5.1.0 under two weeks old", advisory names, "npm audit: 0 vulnerabilities") | Removed; D18 now only says caret ranges + committed lock file | Review: nobody had run `npm view` / `npm audit` to check; a decision log must not contain unverified facts | DECISIONS D18 (revised)
+2026-11-08 | Claude (my own plan) | Planned spike rule "up to 30 min = spike" | Revised to provable bounds (max <= 30 spike, min > 30 sustained, otherwise unverified) | Review: a single high reading on a 15-min logger has max exactly 30 min, so the main case sat on the boundary; a 30-min logger was undefined | DECISIONS D8, `events.test.ts` boundary test
+2026-11-08 | Claude (my own plan) | Typical interval = median of deltas | Changed to most common delta | Writing the email-sample test: Jerusalem has deltas 15 and 135, median 75, so the 2h15m gap was not detected | DECISIONS D5, `gaps.test.ts`
+2026-11-08 | Claude (my own plan) | INIT.md sample table had 11 of the 16 rows (missing Haifa 39.0, Tel Aviv 06:30 4.3 and three Rishon rows) | Replaced by the exact 16 rows and made them a fixture with an end-to-end test | Compared INIT.md with the PDF row by row | INIT.md section 1, D20, `emailSample.test.ts`
+2026-11-08 | Claude | Rewrote D15 to drop Express, Tailwind and Recharts ("zero runtime dependencies"), justified as fewer risks for the reviewer | Reverted to the original stack | I pointed out the assignment only says "no accounts, no paid services"; the real reason was that the AI's sandbox could not download packages, an AI limitation presented as a project decision | DECISIONS D15, D17

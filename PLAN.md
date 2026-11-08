@@ -1,12 +1,18 @@
 # PLAN (checklist)
+
 ## A scaffold
-- [ ] public GitHub repo (verify public) - [x] workspaces + TS + Vitest + Tailwind v4 - [x] dev script - [ ] first commit
+- [ ] workspaces + TS + Vitest + Tailwind v4 - [ ] `concurrently` dev script - [ ] Express `/api/health` - [ ] `.gitignore`
+
 ## B core + tests
-- [ ] parseTime - [ ] parseTemp - [ ] normalizeNames - [ ] detectColumns - [ ] units (Fahrenheit test committed alone)
-- [ ] dedupe - [ ] gaps - [ ] events - [ ] trend - [ ] status - [ ] assignments
-## C seed + DB + API
-- [ ] schema.sql - [ ] seed (Rishon, Tel Aviv, Haifa, messy files) - [ ] preview - [ ] confirm (idempotent) - [ ] dashboard - [ ] fridge - [ ] report - [ ] search - [ ] threshold PATCH
+- [ ] units (Fahrenheit test committed alone, failing) - [ ] time + parseTime - [ ] parseTemp - [ ] csv - [ ] names - [ ] columns
+- [ ] dedupe - [ ] gaps - [ ] events - [ ] trend - [ ] status - [ ] assignments - [ ] report - [ ] analyze - [ ] email sample end to end
+
+## C DB + import + seed + API
+- [ ] schema.sql - [ ] import preview / confirm (idempotent) - [ ] seed + sample-data - [ ] dashboard - [ ] fridge - [ ] report
+- [ ] search - [ ] PATCH fridge - [ ] CRUD-lite
+
 ## D client
-- [ ] dashboard - [ ] upload+preview - [ ] fridge chart - [ ] inspector report + print - [ ] threshold search - [ ] check at 375px
+- [ ] dashboard - [ ] upload + preview - [ ] fridge chart - [ ] inspector report + print - [ ] search - [ ] setup - [ ] check at 375px
+
 ## E docs
-- [ ] README from clean clone - [ ] NOTES.md - [ ] DECISIONS/AI_LOG up to date
+- [ ] README from clean clone - [ ] NOTES.md - [ ] DECISIONS / AI_LOG up to date
