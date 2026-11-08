@@ -1,7 +1,7 @@
 # PLAN (checklist)
 
 ## A scaffold
-- [ ] workspaces + TS + Vitest + Tailwind v4 - [ ] `concurrently` dev script - [ ] Express `/api/health` - [ ] `.gitignore`
+- [x] workspaces + TS + Vitest + Tailwind v4 - [x] `concurrently` dev script - [x] Express `/api/health` - [x] `.gitignore`
 
 ## B core + tests
 - [ ] units (Fahrenheit test committed alone, failing) - [ ] time + parseTime - [ ] parseTemp - [ ] csv - [ ] names - [ ] columns
