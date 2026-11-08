@@ -89,6 +89,16 @@ describe('names', () => {
 });
 
 describe('csv + detectColumns', () => {
+  it('strips a UTF-8 BOM (Excel "CSV UTF-8" export) so the first cell reads "Logger"', () => {
+    const t = parseCsv('\uFEFFLogger,Temp\r\nTL-0512,3.8');
+    expect(t.rows[0].cells[0]).toBe('Logger');
+    expect(t.delimiter).toBe(',');
+    // Guards behaviour, not one line: String.prototype.trim() also removes U+FEFF and quotes open
+    // anywhere in a cell, so this stays green even without the regex in csv.ts. Excel quotes cells.
+    const q = parseCsv('\uFEFF"Logger","Temp"\r\n"TL-0512","3.8"');
+    expect(q.rows[0].cells).toEqual(['Logger', 'Temp']);
+  });
+
   it('reads the email sample (tab separated) as a 5-column sheet with a header', () => {
     const t = parseCsv(EMAIL_SAMPLE_TSV);
     expect(t.delimiter).toBe('\t');

@@ -2,7 +2,7 @@
 export type Delimiter = '\t' | ',' | ';';
 
 export function detectDelimiter(text: string): Delimiter {
-  const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter((l) => l.trim()).slice(0, 20);
+  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((l) => l.trim()).slice(0, 20);
   const candidates: Delimiter[] = ['\t', ';', ','];
   let best: Delimiter = ',';
   let bestScore = -1;
@@ -43,7 +43,7 @@ export interface CsvTable {
 }
 
 export function parseCsv(text: string): CsvTable {
-  const clean = text.replace(/^﻿/, '');
+  const clean = text.replace(/^\uFEFF/, '');
   const delimiter = detectDelimiter(clean);
   const rows: CsvTable['rows'] = [];
   clean.split(/\r?\n/).forEach((line, i) => {
