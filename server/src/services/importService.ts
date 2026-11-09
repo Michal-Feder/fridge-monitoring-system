@@ -10,8 +10,8 @@ import { suggestUnit, toCelsius, type Unit, type UnitSuggestion } from '../core/
 import { rowKey, markConflicts } from '../core/dedupe.ts';
 import { valueKey } from '../core/parseTemp.ts';
 import { typicalInterval, findGaps, fridgeRuns, fridgeMoves } from '../core/gaps.ts';
-import { fridgeAt, changePointsFromRows, rebuildAssignments, sameAssignments } from '../core/assignments.ts';
-import { toMinutes, fromMinutes } from '../core/time.ts';
+import { fridgeForRow, changePointsFromRows, rebuildAssignments, sameAssignments } from '../core/assignments.ts';
+import { toMinutes, fromMinutes, formatTs } from '../core/time.ts';
 
 export interface UploadFile { name: string; text: string }
 export interface Decisions {
@@ -65,6 +65,8 @@ export interface FileSummary {
     fridge: string | null;
     fridgeSource: 'history' | 'decision' | null;
     needsAssignment: boolean;
+    /** D44: where the rows go, in time order; more than one entry when the file spans a logger move */
+    split: { branch: string; fridge: string; from: string; to: string; rows: number }[];
   };
   warnings: string[];
 }
@@ -185,23 +187,36 @@ function plan(db: Db, files: UploadFile[], decisions: Decisions = {}): Plan {
     else if (dec.loggerId && looksLikeLoggerId(dec.loggerId)) { loggerId = normalizeLoggerId(dec.loggerId); loggerIdSource = 'decision'; }
     else if (p.loggerIdFromName) { loggerId = p.loggerIdFromName; loggerIdSource = 'filename'; }
 
-    let branch: string | null = null;
-    let fridge: string | null = null;
+    // D44: without a decision, each row goes to the fridge the logger history gives for its time (a file can
+    // span a logger move); a decision puts every row in the chosen fridge, with a warning where the history disagrees
+    const sorted = [...p.rows].sort((a, b) => (a.ts < b.ts ? -1 : 1));
+    const fromHistory = (ts: string) => {
+      const fid = loggerId ? fridgeForRow(history, loggerId, ts) : null;
+      const f = fid !== null ? fridgeById.get(fid) : undefined;
+      return f ? { branch: f.branch, fridge: f.name } : null;
+    };
+    let place: ((ts: string) => { branch: string; fridge: string } | null) | null = null;
     let fridgeSource: NonNullable<FileSummary['raw']>['fridgeSource'] = null;
     if (dec.branch && dec.fridge) {
-      branch = canonBranch(dec.branch);
-      fridge = canonFridge(branch, dec.fridge);
+      const chosen = { branch: canonBranch(dec.branch), fridge: '' };
+      chosen.fridge = canonFridge(chosen.branch, dec.fridge);
+      place = () => chosen;
       fridgeSource = 'decision';
-    } else if (loggerId && p.rows.length) {
-      const first = [...p.rows].sort((a, b) => (a.ts < b.ts ? -1 : 1))[0].ts;
-      const fid = fridgeAt(history, loggerId, first) ?? history.filter((a) => a.loggerId === loggerId && a.validTo === null).at(-1)?.fridgeId ?? null;
-      const f = fid !== null ? fridgeById.get(fid) : undefined;
-      if (f) { branch = f.branch; fridge = f.name; fridgeSource = 'history'; }
+      const label = (x: { branch: string; fridge: string }) => `${x.branch} / ${x.fridge}`;
+      const disagree = segments(sorted.map((r) => ({ ts: r.ts, at: fromHistory(r.ts) })).filter((x) => x.at && nameKey(label(x.at)) !== nameKey(label(chosen))).map((x) => ({ ts: x.ts, at: x.at! })));
+      for (const d of disagree) {
+        s.warnings.push(`You chose ${label(chosen)} for all ${sorted.length} rows, but the logger history puts ${d.rows} of them in ${label(d)} (${formatTs(d.from)} to ${formatTs(d.to)}). Check before saving.`);
+      }
+    } else if (loggerId && sorted.length && fromHistory(sorted[0].ts)) {
+      place = fromHistory;
+      fridgeSource = 'history';
     }
-    const needsAssignment = !loggerId || !branch || !fridge;
-    s.raw = { loggerId, loggerIdSource, branch, fridge, fridgeSource, needsAssignment };
+    const placed = place ? sorted.map((r) => ({ r, at: place!(r.ts) })) : [];
+    const needsAssignment = !loggerId || !place || placed.some((x) => !x.at);
+    const split = needsAssignment ? [] : segments(placed.map((x) => ({ ts: x.r.ts, at: x.at! })));
+    s.raw = { loggerId, loggerIdSource, branch: split[0]?.branch ?? null, fridge: split[0]?.fridge ?? null, fridgeSource, needsAssignment, split };
     if (needsAssignment) continue;
-    for (const r of p.rows) draft.push({ file: p.name, lineNo: r.lineNo, loggerId: loggerId!, branch: branch!, fridge: fridge!, ts: r.ts, originalValue: r.originalValue, value: r.value, status: r.status });
+    for (const { r, at } of placed) draft.push({ file: p.name, lineNo: r.lineNo, loggerId: loggerId!, branch: at!.branch, fridge: at!.fridge, ts: r.ts, originalValue: r.originalValue, value: r.value, status: r.status });
   }
 
   // --- units per logger (D3, D28)
@@ -307,6 +322,17 @@ function plan(db: Db, files: UploadFile[], decisions: Decisions = {}): Plan {
     units,
     parsed,
   };
+}
+
+/** Consecutive rows (in time order) with the same branch / fridge, for the preview. */
+function segments(rows: { ts: string; at: { branch: string; fridge: string } }[]) {
+  const out: { branch: string; fridge: string; from: string; to: string; rows: number }[] = [];
+  for (const x of rows) {
+    const last = out.at(-1);
+    if (last && last.branch === x.at.branch && last.fridge === x.at.fridge) { last.to = x.ts; last.rows++; }
+    else out.push({ branch: x.at.branch, fridge: x.at.fridge, from: x.ts, to: x.ts, rows: 1 });
+  }
+  return out;
 }
 
 export function previewImport(db: Db, files: UploadFile[], decisions: Decisions = {}): PreviewResult {

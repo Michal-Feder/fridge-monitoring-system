@@ -9,7 +9,8 @@ export type Route =
   | { page: 'fridge'; id: number; range: Partial<Range> }
   | { page: 'report'; id: number; range: Partial<Range> }
   | { page: 'search'; query: URLSearchParams }
-  | { page: 'setup' };
+  | { page: 'setup' }
+  | { page: 'branchReport'; branch: number | 'all'; range: Partial<Range> };
 
 export function parseHash(hash: string): Route {
   const [path, query = ''] = (hash.replace(/^#/, '') || '/').split('?');
@@ -20,6 +21,10 @@ export function parseHash(hash: string): Route {
   if (path === '/upload') return { page: 'upload' };
   if (path === '/search') return { page: 'search', query: q };
   if (path === '/setup') return { page: 'setup' };
+  if (path === '/report/branch') {
+    const b = q.get('branch');
+    return { page: 'branchReport', branch: b && /^\d+$/.test(b) ? Number(b) : 'all', range };
+  }
   const m = /^\/fridge\/(\d+)(\/report)?$/.exec(path);
   if (m) return { page: m[2] ? 'report' : 'fridge', id: Number(m[1]), range };
   return { page: 'dashboard' };
@@ -38,6 +43,12 @@ export const href = {
   upload: '#/upload',
   search: (params?: Record<string, string>) => `#/search${params ? `?${new URLSearchParams(params)}` : ''}`,
   setup: '#/setup',
+  branchReport: (branch: number | 'all', r?: Partial<Range>) => {
+    const q = new URLSearchParams({ branch: String(branch) });
+    if (r?.from) q.set('from', r.from);
+    if (r?.to) q.set('to', r.to);
+    return `#/report/branch?${q}`;
+  },
   fridge: (id: number, r?: Partial<Range>) => withRange(`/fridge/${id}`, r),
   report: (id: number, r?: Partial<Range>) => withRange(`/fridge/${id}/report`, r),
 };

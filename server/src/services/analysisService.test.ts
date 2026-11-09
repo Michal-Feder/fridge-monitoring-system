@@ -3,7 +3,7 @@ import { openDb, type Db } from '../db/connection.ts';
 import * as repo from '../db/repo.ts';
 import { generateSeedFiles } from '../seed/generate.ts';
 import { seedDatabase } from '../seed/seedDatabase.ts';
-import { dashboard, fridgeDetail, fridgeReport, search } from './analysisService.ts';
+import { branchReport, dashboard, fridgeDetail, fridgeReport, search } from './analysisService.ts';
 import { levelRank } from '../core/status.ts';
 
 let db: Db;
@@ -79,6 +79,18 @@ describe('fridge page', () => {
     expect(() => fridgeDetail(db, idOf('Haifa / Dairy'), { from: '2026-09-15T00:00', to: '2026-09-14T00:00' })).toThrow(/must be before/);
     expect(() => fridgeDetail(db, 9999)).toThrow(/does not exist/);
   });
+
+  it('D40 on the fridge page too: coverage says whether "never above" can be said at all', () => {
+    const day = { from: '2026-09-14T00:00', to: '2026-09-14T23:59' };
+    // no readings: Tel Aviv / Display 2 got its logger on 17 Sep
+    expect(fridgeDetail(db, idOf('Tel Aviv / Display 2'), day).coverage).toMatchObject({ percent: 0, missingMinutes: 1439 });
+    // a 2h15m gap: Jerusalem / Dairy has readings, but not all day
+    const jer = fridgeDetail(db, idOf('Jerusalem / Dairy'), day).coverage;
+    expect(jer.missingMinutes).toBeGreaterThanOrEqual(135);
+    expect(jer.percent).toBeLessThan(100);
+    // full: Rishon / Cream cakes logs every 15 min all day
+    expect(fridgeDetail(db, idOf('Rishon LeZion / Cream cakes'), day).coverage).toMatchObject({ percent: 100, missingMinutes: 0, uncovered: [] });
+  });
 });
 
 describe('inspector report', () => {
@@ -86,6 +98,26 @@ describe('inspector report', () => {
     const r = fridgeReport(db, idOf('Rishon LeZion / Cream cakes'), { from: '2026-09-14T00:00', to: '2026-09-14T23:59' });
     expect(r.report.headline).toBe('Rishon LeZion / Cream cakes went above 5.0 °C 1 time between 14 Sep 2026 00:00 and 14 Sep 2026 23:59.');
     expect(r.report.sentences[0]).toContain('from 14 Sep 2026 06:15 to 14 Sep 2026 08:00 (between 1 h 45 min and 2 h 15 min), peak 7.4 °C');
+  });
+
+  it('D45: a period that ends inside an excursion is not "still above": the excursion continued after the end', () => {
+    const range = { from: '2026-09-14T00:00', to: '2026-09-14T06:30' }; // Cream cakes: above 06:15-08:00, normal at 08:15
+    const r = fridgeReport(db, idOf('Rishon LeZion / Cream cakes'), range);
+    expect(r.events).toHaveLength(1);
+    expect(r.events[0]).toMatchObject({ ongoing: false, continuesAfter: true, firstHigh: '2026-09-14T06:15', lastHigh: '2026-09-14T08:00', class: 'sustained' });
+    const text = [r.report.headline, ...r.report.sentences].join(' ');
+    expect(text).not.toMatch(/still above/);
+    expect(text).toMatch(/continued after the end of the period \(until 14 Sep 2026 08:00\)/);
+    // the fridge page uses the same events
+    expect(fridgeDetail(db, idOf('Rishon LeZion / Cream cakes'), range).events[0]).toMatchObject({ ongoing: false, continuesAfter: true });
+    // ongoing only when still above at the latest data: Rishon / Dairy, period ending on 20 Sep 12:00
+    const dairy = fridgeReport(db, idOf('Rishon LeZion / Dairy'), { from: '2026-09-19T00:00', to: '2026-09-20T12:00' });
+    expect(dairy.events.at(-1)).toMatchObject({ ongoing: true, continuesAfter: true });
+  });
+
+  it('the longest excursion reads "Longest: above ...", not "Longest: Excursion: above ..."', () => {
+    const r = fridgeReport(db, idOf('Rishon LeZion / Cream cakes'), { from: '2026-09-14T00:00', to: '2026-09-14T23:59' });
+    expect(r.report.sentences[0]).toBe('Longest: above 5.0 °C from 14 Sep 2026 06:15 to 14 Sep 2026 08:00 (between 1 h 45 min and 2 h 15 min), peak 7.4 °C.');
   });
 
   it('labels the door spike instead of hiding it, and notes the gap, the error and the °F conversion', () => {
@@ -104,6 +136,31 @@ describe('inspector report', () => {
   });
 });
 
+describe('branch report (D46)', () => {
+  const rishon = () => repo.branches(db).find((b) => b.name === 'Rishon LeZion')!.id;
+
+  it('Rishon LeZion 13-20 Sep: one row per fridge, Dairy and Cream cakes with excursions, all fully covered', () => {
+    const r = branchReport(db, rishon(), { from: '2026-09-13T00:00', to: '2026-09-20T23:59' });
+    expect(r.scope).toEqual({ branchId: rishon(), name: 'Rishon LeZion' });
+    expect(r.summary.map((x) => x.fridge.name)).toEqual(['Cream cakes', 'Dairy', 'Drinks']);
+    const row = (name: string) => r.summary.find((x) => x.fridge.name === name)!;
+    expect(row('Cream cakes')).toMatchObject({ times: 1, peak: 7.4, longest: { minMinutes: 105, maxMinutes: 135 } });
+    expect(row('Dairy')).toMatchObject({ times: 1, peak: 6.9, longest: { ongoing: true } });
+    expect(row('Drinks')).toMatchObject({ times: 0, peak: null, longest: null });
+    expect(r.summary.every((x) => x.coverage === 100)).toBe(true);
+    // each fridge's full report follows, in the same order
+    expect(r.fridges.map((f) => f.fridge.name)).toEqual(['Cream cakes', 'Dairy', 'Drinks']);
+    expect(r.fridges[0].report.headline).toMatch(/went above 5\.0 °C 1 time/);
+  });
+
+  it('"all" covers every branch; an unknown branch is a 404', () => {
+    const all = branchReport(db, 'all', { from: '2026-09-14T00:00', to: '2026-09-14T23:59' });
+    expect(all.scope).toEqual({ branchId: null, name: 'All branches' });
+    expect(all.summary).toHaveLength(repo.fridges(db).length);
+    expect(() => branchReport(db, 9999)).toThrow(/does not exist/);
+  });
+});
+
 describe('threshold search (D29)', () => {
   const labels = (r: ReturnType<typeof search>) => r.results.map((x) => `${x.fridge.branch} / ${x.fridge.name}`).sort();
 
@@ -119,6 +176,15 @@ describe('threshold search (D29)', () => {
       expect.arrayContaining(['Tel Aviv / Display 1', 'Tel Aviv / Display 2', 'Tel Aviv / Walk-in']),
     );
     expect(labels(search(db, { above: 7, minMinutes: 0, certainty: 'possibly' }))).toEqual(['Rishon LeZion / Cream cakes', 'Tel Aviv / Display 1', 'Tel Aviv / Walk-in']);
+  });
+
+  it('D47: for the printout, says how many fridges were checked and the coverage of each match', () => {
+    const r = search(db, { above: 5, minMinutes: 45, certainty: 'certainly' });
+    expect(r.checked).toBe(repo.fridges(db).length);
+    expect(r.results.find((x) => x.fridge.name === 'Cream cakes')!.coverage).toBe(100);
+    // nothing found: still says what was checked
+    const none = search(db, { above: 20, minMinutes: 30, certainty: 'possibly' });
+    expect(none).toMatchObject({ results: [], checked: repo.fridges(db).length });
   });
 
   it('only searches the chosen dates', () => {

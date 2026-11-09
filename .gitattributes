@@ -1,0 +1,3 @@
+# The seed writes sample-data/*.csv with LF line endings. Without this, a Windows clone (core.autocrlf=true)
+# checks them out as CRLF and every `npm run seed` shows them as modified although the content is identical.
+sample-data/*.csv text eol=lf

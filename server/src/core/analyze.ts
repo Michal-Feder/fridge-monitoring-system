@@ -31,6 +31,8 @@ export interface EventView {
   readingsAbove: number;
   errorsInside: number;
   conflictsInside: number;
+  /** D45: the excursion went on past the end of the period asked for (lastHigh after it) */
+  continuesAfter: boolean;
 }
 
 export interface GapView { from: LocalTs; to: LocalTs; minutes: number }
@@ -48,7 +50,7 @@ export interface FridgeAnalysis {
   lastReading: { ts: LocalTs; tempC: number | null; loggerId: string } | null;
 }
 
-export function toEventView(e: Excursion): EventView {
+export function toEventView(e: Excursion, periodEndMin = Infinity): EventView {
   const f = (m: number | null) => (m === null ? null : fromMinutes(m));
   return {
     firstHigh: fromMinutes(e.firstHighMin),
@@ -68,6 +70,7 @@ export function toEventView(e: Excursion): EventView {
     readingsAbove: e.readingsAbove,
     errorsInside: e.errorsInside,
     conflictsInside: e.conflictsInside,
+    continuesAfter: e.lastHighMin > periodEndMin,
   };
 }
 
@@ -92,6 +95,12 @@ export interface AnalyzeInput {
   windowStart: LocalTs;
   hasLogger: boolean;
   currentLoggerId?: string | null;
+  /**
+   * D45: excursions are found in the readings up to this time (the latest data), so a period that ends inside one
+   * still gets its real end, and "ongoing" means "still above at the latest data". Status, trend and counts stay
+   * at `asOf`. Defaults to `asOf`.
+   */
+  eventsUntil?: LocalTs;
   /** scan for the first time the warm-up warning would have fired, between these times */
   warningScan?: { from: LocalTs; to: LocalTs } | null;
 }
@@ -106,10 +115,16 @@ export function analyzeFridge(input: AnalyzeInput): FridgeAnalysis {
   const typical = new Map<string, number | null>();
   for (const [l, times] of timesByLogger) typical.set(l, typicalInterval(times));
 
-  const gaps: Gap[] = findGapsMulti(readings.map((r) => ({ t: toMinutes(r.ts), loggerId: r.loggerId })), typical);
+  const untilMin = Math.max(asOfMin, input.eventsUntil ? toMinutes(input.eventsUntil) : asOfMin);
+  const extended = input.readings.filter((r) => toMinutes(r.ts) <= untilMin);
+  const typicalExt = new Map(typical);
+  for (const r of extended) if (!typicalExt.has(r.loggerId)) typicalExt.set(r.loggerId, typicalInterval(extended.filter((x) => x.loggerId === r.loggerId).map((x) => toMinutes(x.ts))));
+  const gapsExt: Gap[] = findGapsMulti(extended.map((r) => ({ t: toMinutes(r.ts), loggerId: r.loggerId })), typicalExt);
+  // gaps reported for the period: those that start before its end (one may run past it)
+  const gaps: Gap[] = gapsExt.filter((g) => g.fromMin < asOfMin);
   const series = toSeries(readings);
-  const events = findExcursions(series, input.threshold, gaps);
-  const inWindow = (e: Excursion) => e.lastHighMin >= windowMin || e.ongoing;
+  const events = findExcursions(toSeries(extended), input.threshold, gapsExt);
+  const inWindow = (e: Excursion) => (e.lastHighMin >= windowMin || e.ongoing) && e.firstHighMin <= asOfMin;
   const eventsInWindow = events.filter(inWindow);
 
   const tempPoints: TempPoint[] = series.filter((p) => p.temp !== null).map((p) => ({ t: p.t, temp: p.temp as number }));
@@ -141,8 +156,8 @@ export function analyzeFridge(input: AnalyzeInput): FridgeAnalysis {
   return {
     level,
     reasons,
-    events: events.map(toEventView),
-    eventsInWindow: eventsInWindow.map(toEventView),
+    events: events.map((e) => toEventView(e, asOfMin)),
+    eventsInWindow: eventsInWindow.map((e) => toEventView(e, asOfMin)),
     gaps: gaps.map((g) => ({ from: fromMinutes(g.fromMin), to: fromMinutes(g.toMin), minutes: g.minutes })),
     trend,
     firstWarning: warn,

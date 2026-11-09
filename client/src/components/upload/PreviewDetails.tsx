@@ -102,8 +102,19 @@ function FileDetails({ file }: { file: FileSummary }) {
             {file.raw && (
               <p>
                 {s.rawLogger(file.raw.loggerId, file.raw.loggerIdSource)}
-                {file.raw.branch && file.raw.fridge && ` · ${file.raw.branch} / ${file.raw.fridge} ${s.rawFrom(file.raw.fridgeSource)}`}
+                {file.raw.split.length === 1 && ` · ${file.raw.branch} / ${file.raw.fridge} ${s.rawFrom(file.raw.fridgeSource)}`}
               </p>
+            )}
+            {file.raw && file.raw.split.length > 1 && (
+              // D44: the file spans a logger move; each part goes to the fridge the history gives for its time
+              <div>
+                <p className="text-slate-500">{s.rawSplit}</p>
+                <ul className="list-inside list-disc">
+                  {file.raw.split.map((x) => (
+                    <li key={x.from}>{s.rawSplitLine(`${x.branch} / ${x.fridge}`, x.from, x.to, x.rows)}</li>
+                  ))}
+                </ul>
+              </div>
             )}
             <p className="text-slate-600">
               {s.rows(file.rowsRead)} · {s.totals.newRows.toLowerCase()} {file.newRows} · {s.totals.alreadyInDb.toLowerCase()} {file.alreadyInDb} · {s.totals.exactDuplicates.toLowerCase()} {file.exactDuplicates} · {s.totals.conflicts.toLowerCase()} {file.conflicts} · {s.totals.errorReadings.toLowerCase()} {file.errorReadings}

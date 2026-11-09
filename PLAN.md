@@ -15,4 +15,11 @@
 - [x] dashboard - [x] upload + preview - [x] fridge chart - [x] inspector report + print - [x] search - [x] setup - [x] check at 375px
 
 ## E docs
-- [ ] README from clean clone - [ ] NOTES.md - [ ] DECISIONS / AI_LOG up to date
+- [x] README from clean clone (clone, `npm install`, `npm run seed`, `seed -- --empty`, `npm test`, `npm run build`, `npm run dev` checked on Windows / Node 24.12)
+- [x] NOTES.md (left: "Time spent", to be filled in by hand) - [x] DECISIONS (D1-D47) / AI_LOG up to date
+
+## Review fixes and extras
+- [x] raw file across a logger move (D44) - [x] period ending inside an excursion (D45) - [x] branch report (D46)
+
+## Left (not in the brief, see NOTES "Not done / next hour")
+- [ ] alerts, over-cooling check (D30), acknowledging an excursion (question for Summer), CSV export of the report

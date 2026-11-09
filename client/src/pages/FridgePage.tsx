@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, errorMessage, type EventView, type FridgeDetail, type Range } from '../api.ts';
+import { api, errorMessage, type Coverage, type EventView, type FridgeDetail, type Range } from '../api.ts';
 import { strings } from '../strings.ts';
 import { tsDate } from '../format.ts';
 import { href } from '../router.ts';
@@ -88,7 +88,7 @@ function FridgeBody({ data, reload }: { data: FridgeDetail; reload: () => void }
         </section>
       )}
 
-      <Events events={data.events} maxTemp={f.maxTemp} />
+      <Events events={data.events} maxTemp={f.maxTemp} coverage={data.coverage} readings={data.readings.length} />
       <Quality data={data} />
       <Threshold id={f.id} maxTemp={f.maxTemp} onSaved={reload} />
       <LoggerHistory data={data} onChanged={reload} />
@@ -142,7 +142,7 @@ const EVENT_STYLE: Record<EventView['class'], string> = {
   spike: 'border-l-8 border-slate-300',
 };
 
-function Events({ events, maxTemp }: { events: EventView[]; maxTemp: number }) {
+function Events({ events, maxTemp, coverage, readings }: { events: EventView[]; maxTemp: number; coverage: Coverage; readings: number }) {
   const s = strings.fridge;
   return (
     <section>
@@ -150,7 +150,10 @@ function Events({ events, maxTemp }: { events: EventView[]; maxTemp: number }) {
         {s.events} ({events.length})
       </h3>
       {events.length === 0 ? (
-        <p className="mt-2 text-sm text-slate-600">{s.eventsNone(maxTemp)}</p>
+        <p className={`mt-2 text-sm ${readings === 0 || coverage.missingMinutes > 0 ? 'font-medium text-amber-900' : 'text-slate-600'}`}>
+          {/* D40: "never above" only about time that has readings */}
+          {readings === 0 ? s.eventsNoneNoData : coverage.missingMinutes > 0 ? s.eventsNonePartial(maxTemp, coverage.percent) : s.eventsNone(maxTemp)}
+        </p>
       ) : (
         <ul className="mt-2 space-y-2">
           {[...events].reverse().map((e) => (

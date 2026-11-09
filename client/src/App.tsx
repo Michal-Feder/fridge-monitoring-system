@@ -6,6 +6,7 @@ import { FridgePage } from './pages/FridgePage.tsx';
 import { ReportPage } from './pages/ReportPage.tsx';
 import { SearchPage } from './pages/SearchPage.tsx';
 import { SetupPage } from './pages/SetupPage.tsx';
+import { BranchReportPage } from './pages/BranchReportPage.tsx';
 
 type NavPage = 'dashboard' | 'upload' | 'search' | 'setup';
 const NAV: { page: NavPage; href: string; label: string }[] = [
@@ -18,7 +19,7 @@ const NAV: { page: NavPage; href: string; label: string }[] = [
 export default function App() {
   const route = useRoute();
   // the fridge page and its report belong to the dashboard tab
-  const active: NavPage = route.page === 'fridge' || route.page === 'report' ? 'dashboard' : route.page;
+  const active: NavPage = route.page === 'fridge' || route.page === 'report' || route.page === 'branchReport' ? 'dashboard' : route.page;
   return (
     <div className="min-h-screen">
       <header className="border-b border-slate-200 bg-white print:hidden">
@@ -52,6 +53,8 @@ export default function App() {
           <SearchPage query={route.query} />
         ) : route.page === 'setup' ? (
           <SetupPage />
+        ) : route.page === 'branchReport' ? (
+          <BranchReportPage key={String(route.branch)} branch={route.branch} range={route.range} />
         ) : (
           <DashboardPage />
         )}

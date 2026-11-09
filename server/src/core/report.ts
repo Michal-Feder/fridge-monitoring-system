@@ -70,17 +70,28 @@ export function coverage(r: Pick<ReportInput, 'from' | 'to' | 'dataEnd' | 'gapLi
 const t = (ts: LocalTs) => formatTs(ts);
 const deg = (n: number) => `${n.toFixed(1)} °C`;
 
-export function durationText(e: EventView): string {
+/** `withContinued: false` when the caller adds the D45 "continued after the end" part itself (no nested brackets). */
+export function durationText(e: EventView, withContinued = true): string {
   if (e.ongoing) return `at least ${formatDuration(e.minMinutes)}, still above at the last reading`;
-  if (!e.durationKnown) return `at least ${formatDuration(e.minMinutes)}; exact length unknown because ${e.startsAtDataStart ? 'the data starts while it was already above' : 'of a gap in the data'}`;
-  if (e.minMinutes === e.maxMinutes) return formatDuration(e.minMinutes);
-  return `between ${formatDuration(e.minMinutes)} and ${formatDuration(e.maxMinutes as number)}`;
+  const base = !e.durationKnown
+    ? `at least ${formatDuration(e.minMinutes)}; exact length unknown because ${e.startsAtDataStart ? 'the data starts while it was already above' : 'of a gap in the data'}`
+    : e.minMinutes === e.maxMinutes
+      ? formatDuration(e.minMinutes)
+      : `between ${formatDuration(e.minMinutes)} and ${formatDuration(e.maxMinutes as number)}`;
+  // D45: the period ended inside this excursion; the readings after it show when it really ended
+  return e.continuesAfter && withContinued ? `${base}; ${continuedText(e)}` : base;
 }
 
-export function eventSentence(e: EventView, threshold: number): string {
+function continuedText(e: EventView): string {
+  return `it continued after the end of the period (until ${t(e.lastHigh)})`;
+}
+
+/** `withLabel: false` for the "Longest: ..." sentence, which would otherwise read "Longest: Excursion: above". */
+export function eventSentence(e: EventView, threshold: number, withLabel = true): string {
   const label = { spike: 'Short spike (likely a door opening)', unverified: 'Short excursion that cannot be verified', sustained: 'Excursion', ongoing: 'Ongoing excursion' }[e.class];
   const when = e.readingsAbove === 1 ? `at ${t(e.firstHigh)}` : `from ${t(e.firstHigh)} to ${t(e.lastHigh)}`;
-  return `${label}: above ${deg(threshold)} ${when} (${durationText(e)}), peak ${deg(e.peak)}.`;
+  const continued = e.continuesAfter && !e.ongoing ? `; ${continuedText(e)}` : '';
+  return `${withLabel ? `${label}: a` : 'a'}bove ${deg(threshold)} ${when} (${durationText(e, false)}), peak ${deg(e.peak)}${continued}.`;
 }
 
 export function inspectorReport(r: ReportInput): Report {
@@ -106,7 +117,7 @@ export function inspectorReport(r: ReportInput): Report {
     if (spikes.length) parts.push(`plus ${spikes.length} short spike${spikes.length === 1 ? '' : 's'} of at most 30 minutes`);
     headline = `${r.fridgeLabel} went above ${deg(r.threshold)} ${parts.join(', ')} ${range}.${partial ? ` ${missingSentence}` : ''}`;
     const longest = counted.reduce<EventView | null>((a, b) => (!a || b.minMinutes > a.minMinutes ? b : a), null);
-    if (longest) sentences.push(`Longest: ${eventSentence(longest, r.threshold)}`);
+    if (longest) sentences.push(`Longest: ${eventSentence(longest, r.threshold, false)}`);
     for (const e of r.events) if (e !== longest) sentences.push(eventSentence(e, r.threshold));
   }
 

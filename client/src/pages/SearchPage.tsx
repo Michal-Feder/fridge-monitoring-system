@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, errorMessage, type Certainty, type SearchQuery, type SearchResult } from '../api.ts';
 import { strings } from '../strings.ts';
-import { tsDate } from '../format.ts';
+import { fmtTemp, tsDate } from '../format.ts';
 import { href } from '../router.ts';
 
 type State = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'ok'; data: SearchResult };
@@ -33,7 +33,7 @@ export function SearchPage({ query }: { query: URLSearchParams }) {
 
   return (
     <section className="space-y-4">
-      <div>
+      <div className="print:hidden">
         <h2 className="text-xl font-semibold">{s.title}</h2>
         <p className="text-sm text-slate-600">{s.intro}</p>
       </div>
@@ -66,7 +66,7 @@ function SearchForm({ initial, resolved }: { initial: SearchQuery; resolved: Sea
   const input = 'mt-1 block w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-base';
   return (
     <form
-      className="space-y-3 rounded-lg border border-slate-200 bg-white p-3"
+      className="space-y-3 rounded-lg border border-slate-200 bg-white p-3 print:hidden"
       onSubmit={(e) => {
         e.preventDefault();
         const p: Record<string, string> = { above, minMinutes, certainty };
@@ -114,40 +114,75 @@ function SearchForm({ initial, resolved }: { initial: SearchQuery; resolved: Sea
   );
 }
 
+/**
+ * D47: the results are also a printable document (same print styles as the reports): the query in words, then
+ * every matching fridge with its excursions and coverage, or one sentence saying nothing matched and what was checked.
+ */
 function Results({ data }: { data: SearchResult }) {
   const s = strings.search;
   const f = strings.fridge;
   const q = data.query;
+  const th = 'border-b border-slate-300 px-2 py-1.5 text-left font-semibold';
+  const td = 'border-b border-slate-200 px-2 py-1.5 align-top';
   return (
-    <section>
-      <p className="font-medium">{s.summary(data.results.length, q.above, q.minMinutes, q.from, q.to)}</p>
+    <article className="report rounded-lg border border-slate-200 bg-white p-4 print:border-0 print:p-0">
+      <header className="border-b border-slate-200 pb-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{s.printTitle}</p>
+          <button type="button" onClick={() => window.print()} className="rounded-lg border border-slate-800 px-3 py-1.5 text-sm font-medium print:hidden">
+            {s.print}
+          </button>
+        </div>
+        <p className="mt-1 font-medium">{s.query(q.above, q.minMinutes, q.from, q.to, q.certainty)}</p>
+        <p className="mt-1 text-sm text-slate-600">{s.count(data.results.length, data.checked)}</p>
+      </header>
       {data.results.length === 0 ? (
-        <p className="mt-2 text-sm text-slate-600">{s.none}</p>
+        <>
+          <p className="mt-3">{s.noneSentence(q.above, q.minMinutes, q.from, q.to, data.checked)}</p>
+          <p className="mt-1 text-sm text-slate-600 print:hidden">{s.none}</p>
+        </>
       ) : (
-        <ul className="mt-2 space-y-2">
-          {data.results.map(({ fridge, events }) => (
-            <li key={fridge.id} className="rounded-lg border border-slate-200 bg-white p-3">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <a href={href.fridge(fridge.id, { from: q.from, to: q.to })} className="font-semibold underline decoration-slate-300 underline-offset-2">
+        data.results.map(({ fridge, events, coverage }) => (
+          <section key={fridge.id} className="mt-4 break-inside-avoid">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+              <h3 className="font-semibold">
+                <a href={href.fridge(fridge.id, { from: q.from, to: q.to })} className="underline decoration-slate-300 underline-offset-2 print:no-underline">
                   {fridge.branch} / {fridge.name}
                 </a>
-                <a href={href.report(fridge.id, { from: q.from, to: q.to })} className="text-sm text-slate-600 underline">
-                  {s.report}
-                </a>
-              </div>
-              <ul className="mt-1 space-y-1 text-sm">
-                {events.map((e) => (
-                  <li key={e.firstHigh}>
-                    <span className="font-medium">{f.eventClass[e.class]}</span> · {f.eventWhen(e)}: {f.eventDuration(e)}, {f.eventPeak(e.peak)}
-                  </li>
-                ))}
-              </ul>
-              {/* the search temperature can differ from the fridge's own limit; show both */}
-              <p className="mt-1 text-xs text-slate-500">{strings.dashboard.limit(fridge.maxTemp)}</p>
-            </li>
-          ))}
-        </ul>
+              </h3>
+              <a href={href.report(fridge.id, { from: q.from, to: q.to })} className="text-sm text-slate-600 underline print:hidden">
+                {s.report}
+              </a>
+            </div>
+            <p className={`text-sm ${coverage < 100 ? 'font-medium text-amber-800' : 'text-slate-600'}`}>
+              {s.coverage(coverage)} · {strings.dashboard.limit(fridge.maxTemp)}
+            </p>
+            {/* the table scrolls inside its own box on a phone; the page never scrolls sideways */}
+            <div className="mt-1 overflow-x-auto">
+              <table className="w-full min-w-[32rem] border-collapse text-sm print:min-w-0">
+                <thead>
+                  <tr>
+                    <th className={th}>{strings.report.cols.when}</th>
+                    <th className={th}>{strings.report.cols.duration}</th>
+                    <th className={th}>{strings.report.cols.peak}</th>
+                    <th className={th}>{strings.report.cols.kind}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {events.map((e) => (
+                    <tr key={e.firstHigh}>
+                      <td className={td}>{f.eventWhen(e)}</td>
+                      <td className={td}>{f.eventDuration(e)}</td>
+                      <td className={`${td} whitespace-nowrap`}>{fmtTemp(e.peak)}</td>
+                      <td className={td}>{f.eventClass[e.class]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ))
       )}
-    </section>
+    </article>
   );
 }

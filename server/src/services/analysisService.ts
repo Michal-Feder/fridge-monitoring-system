@@ -4,7 +4,7 @@ import type { Db } from '../db/connection.ts';
 import * as repo from '../db/repo.ts';
 import type { FridgeRow } from '../db/repo.ts';
 import { analyzeFridge, type FridgeAnalysis, type EventView, type GapView } from '../core/analyze.ts';
-import { inspectorReport, type Report } from '../core/report.ts';
+import { coverage, inspectorReport, type Coverage, type Report } from '../core/report.ts';
 import { gapLimit } from '../core/gaps.ts';
 import { currentLogger, type Assignment } from '../core/assignments.ts';
 import { toMinutes, fromMinutes, type LocalTs } from '../core/time.ts';
@@ -43,7 +43,9 @@ interface AnalyzeOpts { range: Range; asOf: LocalTs; history: Assignment[]; scan
 function analyzeRange(db: Db, f: FridgeRow, o: AnalyzeOpts): FridgeAnalysis {
   const loggerId = loggerAt(o.history, f.id, o.range.to, o.range.to >= o.asOf);
   return analyzeFridge({
-    readings: repo.readings(db, f.id, shift(o.range.from, -HISTORY_MARGIN_MIN), o.range.to),
+    // D45: up to the latest data, so excursions running past the end of the period keep their real end
+    readings: repo.readings(db, f.id, shift(o.range.from, -HISTORY_MARGIN_MIN), o.range.to > o.asOf ? o.range.to : o.asOf),
+    eventsUntil: o.asOf,
     threshold: o.threshold ?? f.max_temp,
     asOf: o.range.to,
     windowStart: o.range.from,
@@ -62,6 +64,9 @@ function resolveRange(asOf: LocalTs, range?: Partial<Range>): Range {
 
 const overlaps = (g: GapView, r: Range) => g.to >= r.from && g.from <= r.to;
 const NO_DATA: Reason[] = [{ level: 'grey', code: 'no_data', params: {} }];
+const NO_COVERAGE: Coverage = { periodMinutes: 0, missingMinutes: 0, percent: 0, uncovered: [] };
+/** D40: the most lenient gap limit of the loggers in the range (2.5 x typical interval, D5) */
+const gapLimitOf = (a: FridgeAnalysis) => Math.max(0, ...Object.values(a.typicalIntervalByLogger).map((m) => gapLimit(m) ?? 0)) || null;
 
 // --- dashboard ------------------------------------------------------------------------------------
 
@@ -117,6 +122,8 @@ export interface FridgeDetail {
   /** first time in the range the warm-up warning would have fired (D10) */
   firstWarning: LocalTs | null;
   quality: { readings: number; errors: number; conflicts: number; gaps: number; typicalIntervalByLogger: Record<string, number | null> };
+  /** D40: how much of the range has readings, so the page never says "never above" about time without data */
+  coverage: Coverage;
   loggerHistory: { loggerId: string; unit: Unit | null; validFrom: LocalTs; validTo: LocalTs | null }[];
 }
 
@@ -128,24 +135,26 @@ export function fridgeDetail(db: Db, id: number, range?: Partial<Range>): Fridge
   const asOf = repo.asOf(db);
   const cur = currentLogger(history, id);
   if (!asOf) {
-    return { fridge: info(f), asOf: null, range: null, status: { level: 'grey', reasons: NO_DATA }, currentLogger: cur, readings: [], events: [], gaps: [], trend: null, firstWarning: null, quality: { readings: 0, errors: 0, conflicts: 0, gaps: 0, typicalIntervalByLogger: {} }, loggerHistory };
+    return { fridge: info(f), asOf: null, range: null, status: { level: 'grey', reasons: NO_DATA }, currentLogger: cur, readings: [], events: [], gaps: [], trend: null, firstWarning: null, quality: { readings: 0, errors: 0, conflicts: 0, gaps: 0, typicalIntervalByLogger: {} }, coverage: NO_COVERAGE, loggerHistory };
   }
   const r = resolveRange(asOf, range);
   const now = analyzeRange(db, f, { range: { from: shift(asOf, -WINDOW_MINUTES['7d']), to: asOf }, asOf, history });
   const a = analyzeRange(db, f, { range: r, asOf, history, scanWarnings: true });
   const gaps = a.gaps.filter((g) => overlaps(g, r));
+  const inRange = repo.readings(db, id, r.from, r.to);
   return {
     fridge: info(f),
     asOf,
     range: r,
     status: { level: now.level, reasons: now.reasons },
     currentLogger: cur,
-    readings: repo.readings(db, id, r.from, r.to).map((x) => ({ ts: x.ts, tempC: x.tempC, status: x.status, loggerId: x.loggerId, originalValue: x.originalValue, originalUnit: x.originalUnit })),
+    readings: inRange.map((x) => ({ ts: x.ts, tempC: x.tempC, status: x.status, loggerId: x.loggerId, originalValue: x.originalValue, originalUnit: x.originalUnit })),
     events: a.eventsInWindow,
     gaps,
     trend: now.trend,
     firstWarning: a.firstWarning,
     quality: { readings: a.counts.readingsInWindow, errors: a.counts.errorsInWindow, conflicts: a.counts.conflictsInWindow, gaps: gaps.length, typicalIntervalByLogger: a.typicalIntervalByLogger },
+    coverage: coverage({ from: r.from, to: r.to, dataEnd: asOf, gapLimitMin: gapLimitOf(a), firstReading: inRange[0]?.ts ?? null, lastReading: inRange.at(-1)?.ts ?? null, gaps, readings: inRange.length }),
     loggerHistory,
   };
 }
@@ -185,29 +194,89 @@ export function fridgeReport(db: Db, id: number, range?: Partial<Range>): Fridge
       .map((p) => ({ loggerId: p.loggerId, from: p.validFrom, to: p.validTo })),
     // D40: coverage is judged up to the latest data, with the most lenient gap limit of the fridge's loggers
     dataEnd: asOf,
-    gapLimitMin: Math.max(0, ...Object.values(a.typicalIntervalByLogger).map((m) => gapLimit(m) ?? 0)) || null,
+    gapLimitMin: gapLimitOf(a),
   });
   return { fridge: info(f), range: r, report, events: a.eventsInWindow, gaps };
+}
+
+// --- branch report (D46) -------------------------------------------------------------------------
+
+export interface BranchReportRow {
+  fridge: FridgeInfo;
+  /** times above the limit, spikes not counted (they are labelled in the fridge report) */
+  times: number;
+  spikes: number;
+  /** the longest excursion (by proven length), or null when there was none */
+  longest: Pick<EventView, 'minMinutes' | 'maxMinutes' | 'durationKnown' | 'ongoing' | 'continuesAfter'> | null;
+  peak: number | null;
+  /** D40: % of the period with readings */
+  coverage: number;
+}
+export interface BranchReport {
+  scope: { branchId: number | null; name: string };
+  range: Range | null;
+  summary: BranchReportRow[];
+  /** one full inspector report per fridge, same order as the summary */
+  fridges: FridgeReport[];
+}
+
+/** The inspector visits a branch, not a fridge: one document with a summary row and the full report per fridge. */
+export function branchReport(db: Db, branchId: number | 'all', range?: Partial<Range>): BranchReport {
+  let scope: BranchReport['scope'];
+  if (branchId === 'all') scope = { branchId: null, name: 'All branches' };
+  else {
+    const b = repo.branch(db, branchId);
+    if (!b) throw notFound(`Branch ${branchId} does not exist.`);
+    scope = { branchId: b.id, name: b.name };
+  }
+  const fridges = repo.fridges(db).filter((f) => scope.branchId === null || f.branch_id === scope.branchId);
+  const reports = fridges.map((f) => fridgeReport(db, f.id, range));
+  const summary = reports.map((r): BranchReportRow => {
+    const counted = r.events.filter((e) => e.class !== 'spike');
+    const longest = counted.reduce<EventView | null>((a, b) => (!a || b.minMinutes > a.minMinutes ? b : a), null);
+    return {
+      fridge: r.fridge,
+      times: counted.length,
+      spikes: r.events.length - counted.length,
+      longest: longest && { minMinutes: longest.minMinutes, maxMinutes: longest.maxMinutes, durationKnown: longest.durationKnown, ongoing: longest.ongoing, continuesAfter: longest.continuesAfter },
+      peak: r.events.length ? Math.max(...r.events.map((e) => e.peak)) : null,
+      coverage: r.report.coverage.percent,
+    };
+  });
+  return { scope, range: reports[0]?.range ?? null, summary, fridges: reports };
 }
 
 // --- threshold search (D29) -----------------------------------------------------------------------
 
 export interface SearchQuery { above: number; minMinutes: number; from?: LocalTs; to?: LocalTs; certainty: 'possibly' | 'certainly' }
-export interface SearchResult { query: SearchQuery & Range; results: { fridge: FridgeInfo; events: EventView[] }[] }
+export interface SearchResult {
+  query: SearchQuery & Range;
+  /** D47: how many fridges were searched, so "nothing found" says what was checked */
+  checked: number;
+  /** coverage = % of the period with readings for that fridge (D40) */
+  results: { fridge: FridgeInfo; events: EventView[]; coverage: number }[];
+}
 
 /** "Fridges above X °C for at least N minutes between dates." possibly = the longest possible duration
  *  reaches N (unknown counts as possibly), certainly = the proven duration reaches N (D29). */
 export function search(db: Db, q: SearchQuery): SearchResult {
   const asOf = repo.asOf(db);
-  if (!asOf) return { query: { ...q, from: q.from ?? '', to: q.to ?? '' }, results: [] };
+  if (!asOf) return { query: { ...q, from: q.from ?? '', to: q.to ?? '' }, checked: 0, results: [] };
   const r = resolveRange(asOf, { from: q.from, to: q.to });
   const history = repo.assignments(db);
   const matches = (e: EventView) => (q.certainty === 'certainly' ? e.minMinutes >= q.minMinutes : e.maxMinutes === null || e.maxMinutes >= q.minMinutes);
-  const results = repo
-    .fridges(db)
-    .map((f) => ({ fridge: info(f), events: analyzeRange(db, f, { range: r, asOf, history, threshold: q.above }).eventsInWindow.filter(matches) }))
-    .filter((x) => x.events.length > 0);
+  const all = repo.fridges(db);
+  const results = all
+    .map((f) => ({ f, a: analyzeRange(db, f, { range: r, asOf, history, threshold: q.above }) }))
+    .map(({ f, a }) => ({ f, a, events: a.eventsInWindow.filter(matches) }))
+    .filter((x) => x.events.length > 0)
+    .map(({ f, a, events }) => {
+      const inRange = repo.readings(db, f.id, r.from, r.to);
+      const gaps = a.gaps.filter((g) => overlaps(g, r));
+      const cov = coverage({ from: r.from, to: r.to, dataEnd: asOf, gapLimitMin: gapLimitOf(a), firstReading: inRange[0]?.ts ?? null, lastReading: inRange.at(-1)?.ts ?? null, gaps, readings: inRange.length });
+      return { fridge: info(f), events, coverage: cov.percent };
+    });
   const longest = (x: { events: EventView[] }) => Math.max(...x.events.map((e) => e.minMinutes));
   results.sort((a, b) => longest(b) - longest(a) || a.fridge.branch.localeCompare(b.fridge.branch) || a.fridge.name.localeCompare(b.fridge.name));
-  return { query: { ...q, ...r }, results };
+  return { query: { ...q, ...r }, checked: all.length, results };
 }

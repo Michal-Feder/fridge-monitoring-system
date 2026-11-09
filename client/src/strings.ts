@@ -45,6 +45,10 @@ export const strings = {
     attentionNone: 'Nothing needs attention in this period.',
     ok: 'OK',
     okBranch: (count: number) => `${plural(count, 'fridge')} OK`,
+    okBranchPartial: (ok: number, total: number) => `${ok} of ${total} fridges OK`,
+    okAll: (count: number) => `${plural(count, 'fridge')} OK`,
+    show: 'show',
+    hide: 'hide',
     lastReading: (temp: number | null, ts: string) => `Last reading ${fmtTemp(temp)} at ${fmtTs(ts)}`,
     noReading: 'No readings yet',
     limit: (max: number) => `limit ${fmtTemp(max)}`,
@@ -72,10 +76,20 @@ export const strings = {
     certainly: 'certainly lasted that long',
     certainlyHelp: 'Only excursions proven to be that long by the readings.',
     run: 'Search',
-    summary: (n: number, above: number, min: number, from: string, to: string) =>
-      `${plural(n, 'fridge')} above ${fmtTemp(above)} for at least ${fmtDuration(min)} between ${fmtTs(from)} and ${fmtTs(to)}.`,
-    none: 'No fridge matches. Try a lower temperature or fewer minutes.',
+    none: 'Try a lower temperature or fewer minutes.',
     report: 'Report',
+    // D47: printable results
+    printTitle: 'Temperature search',
+    print: 'Print results',
+    query: (above: number, min: number, from: string, to: string, certainty: 'possibly' | 'certainly') =>
+      `Fridges above ${fmtTemp(above)} for at least ${fmtDuration(min)}, ${fmtTs(from, true)} to ${fmtTs(to, true)}. ` +
+      (certainty === 'possibly'
+        ? 'Counted when an excursion may have lasted that long (including those whose length is unknown because of a gap).'
+        : 'Counted only when the readings prove an excursion lasted that long.'),
+    count: (n: number, checked: number) => `${n} of ${plural(checked, 'fridge')} match.`,
+    noneSentence: (above: number, min: number, from: string, to: string, checked: number) =>
+      `No fridge was above ${fmtTemp(above)} for at least ${fmtDuration(min)} between ${fmtTs(from, true)} and ${fmtTs(to, true)}; ${plural(checked, 'fridge')} were checked.`,
+    coverage: (p: number) => (p >= 100 ? 'Readings cover the whole period' : `Readings cover ${p}% of the period`),
   },
 
   setup: {
@@ -184,6 +198,8 @@ export const strings = {
       const parts = [f.hasIso ? 'YYYY-MM-DD' : null, f.hasSlashed ? `${slashed}${f.ambiguous ? ' (guessed)' : ''}` : null].filter(Boolean);
       return parts.join(' and ') || '—';
     },
+    rawSplit: 'The logger moved during this file; the rows go to (from the logger history):',
+    rawSplitLine: (label: string, from: string, to: string, rows: number) => `${label}: ${fmtTs(from)} to ${fmtTs(to)} (${plural(rows, 'row')})`,
     rawFrom: (src: 'history' | 'decision' | null) => (src === 'history' ? 'from the logger history' : src === 'decision' ? 'chosen by you' : ''),
     rawLogger: (id: string | null, src: string | null) =>
       id ? `Logger ${id}${src === 'filename' ? ' (from the file name)' : src === 'decision' ? ' (typed by you)' : ''}` : 'Logger: not known yet',
@@ -249,17 +265,25 @@ export const strings = {
     warning: (ts: string) => `The warm-up warning first fired at ${fmtTs(ts)}.`,
 
     events: 'Times above the limit',
+    // D40: "never above" is only said about time that has readings
     eventsNone: (max: number) => `Never above ${fmtTemp(max)} in this period.`,
+    eventsNoneNoData: 'No readings in this period, so we cannot tell.',
+    eventsNonePartial: (max: number, percent: number) =>
+      `Never above ${fmtTemp(max)} in the recorded readings. Only ${percent}% of this period has readings; what happened in the rest is unknown.`,
     eventClass: { spike: 'Short spike', unverified: 'Could not be verified', sustained: 'Too warm', ongoing: 'Still too warm' },
     eventWhen: (e: { firstHigh: string; lastHigh: string; readingsAbove: number }) =>
       e.readingsAbove === 1 ? `at ${fmtTs(e.firstHigh)}` : `${fmtTs(e.firstHigh)} to ${fmtTs(e.lastHigh)}`,
-    eventDuration: (e: { minMinutes: number; maxMinutes: number | null; ongoing: boolean; durationKnown: boolean; startsAtDataStart: boolean }) => {
+    eventDuration: (e: { minMinutes: number; maxMinutes: number | null; ongoing: boolean; durationKnown: boolean; startsAtDataStart: boolean; continuesAfter?: boolean; lastHigh?: string }) => {
       if (e.ongoing) return `at least ${fmtDuration(e.minMinutes)}, still above at the last reading`;
-      if (!e.durationKnown) return `at least ${fmtDuration(e.minMinutes)}; exact length unknown (${e.startsAtDataStart ? 'the data starts while it was already above' : 'gap in the data'})`;
-      if (e.minMinutes === e.maxMinutes) return fmtDuration(e.minMinutes);
-      // one high reading: provably at least 0 min, so say only the upper bound
-      if (e.minMinutes === 0) return `up to ${fmtDuration(e.maxMinutes ?? 0)}`;
-      return `${fmtDuration(e.minMinutes)} to ${fmtDuration(e.maxMinutes ?? 0)}`;
+      const base = !e.durationKnown
+        ? `at least ${fmtDuration(e.minMinutes)}; exact length unknown (${e.startsAtDataStart ? 'the data starts while it was already above' : 'gap in the data'})`
+        : e.minMinutes === e.maxMinutes
+          ? fmtDuration(e.minMinutes)
+          : e.minMinutes === 0 // one high reading: provably at least 0 min, so say only the upper bound
+            ? `up to ${fmtDuration(e.maxMinutes ?? 0)}`
+            : `${fmtDuration(e.minMinutes)} to ${fmtDuration(e.maxMinutes ?? 0)}`;
+      // D45: the period ended inside this excursion
+      return e.continuesAfter && e.lastHigh ? `${base}; continued after the end of the period (until ${fmtTs(e.lastHigh)})` : base;
     },
     eventPeak: (peak: number) => `peak ${fmtTemp(peak)}`,
     eventBackAt: (ts: string) => `back to normal at ${fmtTs(ts)}`,
@@ -312,6 +336,22 @@ export const strings = {
       percent >= 100 ? 'Readings cover the whole period.' : `Readings cover ${percent}% of the period; ${fmtDuration(missing)} has no readings.`,
     cols2: { from: 'From', to: 'To', length: 'Length' },
     notes: 'Reliability notes',
+    wholeBranch: (branch: string) => `Whole branch: ${branch}`,
+  },
+
+  branchReport: {
+    title: 'Branch report',
+    branch: 'Branch',
+    all: 'All branches',
+    summary: 'Summary',
+    cols: { fridge: 'Fridge', times: 'Times above the limit', longest: 'Longest', peak: 'Peak', coverage: 'Readings cover' },
+    times: (n: number, spikes: number) => `${n}${spikes ? ` (+${plural(spikes, 'short spike')})` : ''}`,
+    none: '—',
+    coverage: (p: number) => `${p}%`,
+    intro: (n: number) => `${plural(n, 'fridge')}. The full report for each fridge follows the summary, one per page when printed.`,
+    link: 'Branch report',
+    dashboardLink: 'Inspector report for a whole branch (or all branches)',
+    button: 'Inspector report',
   },
 
   /** One sentence per status reason (server core/status.ts codes). */

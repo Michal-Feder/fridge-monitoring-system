@@ -88,6 +88,8 @@ export interface FileSummary {
     fridge: string | null;
     fridgeSource: 'history' | 'decision' | null;
     needsAssignment: boolean;
+    /** D44: where the rows go, in time order; more than one entry when the file spans a logger move */
+    split: { branch: string; fridge: string; from: string; to: string; rows: number }[];
   };
   warnings: string[];
 }
@@ -157,11 +159,20 @@ export interface EventView {
   readingsAbove: number;
   errorsInside: number;
   conflictsInside: number;
+  /** D45: the excursion went on past the end of the period shown */
+  continuesAfter: boolean;
 }
 export interface GapView {
   from: string;
   to: string;
   minutes: number;
+}
+/** D40: how much of a period has readings (the period ends at the latest data if that is earlier) */
+export interface Coverage {
+  periodMinutes: number;
+  missingMinutes: number;
+  percent: number;
+  uncovered: GapView[];
 }
 export interface ChartReading {
   ts: string;
@@ -189,6 +200,8 @@ export interface FridgeDetail {
   trend: { state: string; recentMean: number | null; baseline: number | null; delta: number | null; slopePerHour: number | null } | null;
   firstWarning: string | null;
   quality: { readings: number; errors: number; conflicts: number; gaps: number; typicalIntervalByLogger: Record<string, number | null> };
+  /** D40: how much of the range has readings */
+  coverage: Coverage;
   loggerHistory: LoggerPeriod[];
 }
 export interface FridgeReport {
@@ -198,11 +211,26 @@ export interface FridgeReport {
     headline: string;
     sentences: string[];
     notes: string[];
-    /** D40: how much of the period has readings (period ends at the latest data if earlier) */
-    coverage: { periodMinutes: number; missingMinutes: number; percent: number; uncovered: GapView[] };
+    coverage: Coverage;
   };
   events: EventView[];
   gaps: GapView[];
+}
+
+// --- branch report (analysisService.branchReport, D46)
+export interface BranchReportRow {
+  fridge: FridgeInfo;
+  times: number;
+  spikes: number;
+  longest: Pick<EventView, 'minMinutes' | 'maxMinutes' | 'durationKnown' | 'ongoing' | 'continuesAfter'> | null;
+  peak: number | null;
+  coverage: number;
+}
+export interface BranchReport {
+  scope: { branchId: number | null; name: string };
+  range: Range | null;
+  summary: BranchReportRow[];
+  fridges: FridgeReport[];
 }
 
 // --- threshold search (analysisService.search, D29)
@@ -217,7 +245,9 @@ export interface SearchQuery {
 }
 export interface SearchResult {
   query: { above: number; minMinutes: number; certainty: Certainty; from: string; to: string };
-  results: { fridge: FridgeInfo; events: EventView[] }[];
+  /** D47: how many fridges were searched */
+  checked: number;
+  results: { fridge: FridgeInfo; events: EventView[]; coverage: number }[];
 }
 
 // --- setup (server/src/services/setupService.ts)
@@ -274,6 +304,7 @@ export const api = {
   confirm: (files: UploadFile[], decisions: Decisions) => request<ConfirmResult>('/api/imports/confirm', postJson({ files, decisions }), [422]),
   fridge: (id: number, range?: Partial<Range>) => request<FridgeDetail>(`/api/fridges/${id}${rangeQuery(range)}`),
   report: (id: number, range?: Partial<Range>) => request<FridgeReport>(`/api/fridges/${id}/report${rangeQuery(range)}`),
+  branchReport: (branch: number | 'all', range?: Partial<Range>) => request<BranchReport>(`/api/branches/${branch}/report${rangeQuery(range)}`),
   setMaxTemp: (id: number, maxTemp: string) => request<FridgeInfo>(`/api/fridges/${id}`, json('PATCH', { maxTemp })),
   loggers: () => request<LoggerInfo[]>('/api/loggers'),
   search: (q: SearchQuery) => {

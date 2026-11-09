@@ -53,7 +53,21 @@ export function DashboardPage() {
             </p>
           )}
         </div>
-        <WindowToggle value={window} onChange={choose} />
+        {/* toggle + button fit on one row at 375 px (208 + 6 + ~125 of 343) */}
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <WindowToggle value={window} onChange={choose} />
+          {/* D46: the report for the inspector's visit, same period as the dashboard (all branches; pick one there) */}
+          <a
+            href={
+              state.kind === 'ok' && state.data.asOf && state.data.windowStart
+                ? href.branchReport('all', { from: state.data.windowStart, to: state.data.asOf })
+                : href.branchReport('all')
+            }
+            className="whitespace-nowrap rounded-lg border border-slate-800 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-100 sm:px-3"
+          >
+            {strings.branchReport.button}
+          </a>
+        </div>
       </div>
 
       {state.kind === 'loading' && <p className="mt-6 text-slate-500">{strings.common.loading}</p>}
@@ -107,6 +121,9 @@ function DashboardBody({ data }: { data: Dashboard }) {
   const ok = data.fridges.filter((f) => f.level === 'green');
   const okByBranch = new Map<string, DashboardFridge[]>();
   for (const f of ok) okByBranch.set(f.branch, [...(okByBranch.get(f.branch) ?? []), f]);
+  const branchIds = new Map(data.fridges.map((f) => [f.branch, f.branchId]));
+  const totalByBranch = new Map<string, number>();
+  for (const f of data.fridges) totalByBranch.set(f.branch, (totalByBranch.get(f.branch) ?? 0) + 1);
 
   return (
     <>
@@ -136,37 +153,70 @@ function DashboardBody({ data }: { data: Dashboard }) {
         </div>
       )}
 
-      <h3 className="mt-6 text-sm font-semibold uppercase tracking-wide text-slate-600">
-        {s.ok} ({ok.length})
-      </h3>
-      <div className="mt-2 divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
-        {[...okByBranch.entries()].map(([branch, list]) => (
-          <details key={branch} className="group">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5">
-              <span className="flex items-center gap-2 font-medium">
-                <StatusIcon level="green" className="h-4 w-4 text-green-600" />
-                {branch}
-              </span>
-              <span className="flex items-center gap-2 text-sm text-slate-500">
-                {s.okBranch(list.length)}
-                <span aria-hidden className="transition-transform group-open:rotate-90">›</span>
-              </span>
-            </summary>
-            <ul className="border-t border-slate-100 bg-slate-50 px-3 py-2 text-sm">
-              {list.map((f) => (
-                <li key={f.id} className="flex justify-between gap-2 py-1">
-                  <a href={href.fridge(f.id)} className="underline decoration-slate-300 underline-offset-2 hover:decoration-slate-800">
-                    {f.name}
-                  </a>
-                  <span className="text-slate-500">
-                    {f.lastReading ? `${fmtTemp(f.lastReading.tempC)} · ${fmtTs(f.lastReading.ts)}` : s.noReading}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </details>
-        ))}
-      </div>
+      {/* the fridges that are fine stay out of the way: one row, opened on demand */}
+      {ok.length > 0 && (
+        <details className="group/ok mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-3">
+            <span className="flex items-center gap-2 font-medium">
+              <StatusIcon level="green" className="h-4 w-4 text-green-600" />
+              {s.okAll(ok.length)}
+            </span>
+            <span className="text-sm text-slate-600 underline underline-offset-2">
+              <span className="group-open/ok:hidden">{s.show}</span>
+              <span className="hidden group-open/ok:inline">{s.hide}</span>
+            </span>
+          </summary>
+          <div className="divide-y divide-slate-200 border-t border-slate-200">
+            {[...okByBranch.entries()].map(([branch, list]) => {
+              const total = totalByBranch.get(branch) ?? list.length;
+              // a branch with fridges in "Needs attention" is not all fine: neutral dot, "1 of 3 fridges OK"
+              const allOk = list.length === total;
+              return (
+                <details key={branch} className="group/branch">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5">
+                    <span className="flex items-center gap-2 font-medium">
+                      {allOk ? (
+                        <StatusIcon level="green" className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <span aria-hidden className="mx-1 h-2 w-2 rounded-full bg-slate-400" />
+                      )}
+                      {branch}
+                    </span>
+                    <span className="flex items-center gap-2 text-sm text-slate-500">
+                      {allOk ? s.okBranch(list.length) : s.okBranchPartial(list.length, total)}
+                      <span aria-hidden className="transition-transform group-open/branch:rotate-90">›</span>
+                    </span>
+                  </summary>
+                  <ul className="border-t border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+                    {list.map((f) => (
+                      <li key={f.id} className="flex justify-between gap-2 py-1">
+                        <a href={href.fridge(f.id)} className="underline decoration-slate-300 underline-offset-2 hover:decoration-slate-800">
+                          {f.name}
+                        </a>
+                        <span className="text-slate-500">
+                          {f.lastReading ? `${fmtTemp(f.lastReading.tempC)} · ${fmtTs(f.lastReading.ts)}` : s.noReading}
+                        </span>
+                      </li>
+                    ))}
+                    {/* D46: one printable document for the inspector's visit to this branch */}
+                    <li className="pt-1">
+                      <a href={href.branchReport(branchIds.get(branch) ?? 'all')} className="font-medium text-slate-700 underline underline-offset-2">
+                        {strings.branchReport.link} ›
+                      </a>
+                    </li>
+                  </ul>
+                </details>
+              );
+            })}
+          </div>
+        </details>
+      )}
+      {/* D46: reachable even for a branch with no OK fridge (its row above would not exist) */}
+      <p className="mt-4 text-sm">
+        <a href={href.branchReport('all')} className="text-slate-700 underline underline-offset-2">
+          {strings.branchReport.dashboardLink} ›
+        </a>
+      </p>
     </>
   );
 }

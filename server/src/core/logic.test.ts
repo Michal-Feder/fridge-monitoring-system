@@ -4,7 +4,7 @@ import { typicalInterval, findGaps, fridgeRuns, fridgeMoves } from './gaps.ts';
 import { findExcursions, type SeriesPoint } from './events.ts';
 import { evaluateTrend, firstWarning } from './trend.ts';
 import { analyzeFridge, type Reading } from './analyze.ts';
-import { changePointsFromRows, rebuildAssignments, fridgeAt, hasOverlap, sameAssignments } from './assignments.ts';
+import { changePointsFromRows, rebuildAssignments, fridgeAt, fridgeForRow, hasOverlap, sameAssignments } from './assignments.ts';
 import { inspectorReport } from './report.ts';
 import { toMinutes, fromMinutes } from './time.ts';
 import { levelRank, type Level } from './status.ts';
@@ -276,6 +276,14 @@ describe('assignments (D1, D25) - TL-0417 moved Walk-in -> Display 2', () => {
     expect(fridgeAt(hist, 'TL-0417', '2026-09-15T12:00')).toBe(WALK_IN);
     expect(fridgeAt(hist, 'TL-0417', '2026-09-18T12:00')).toBe(DISPLAY_2);
     expect(hasOverlap(hist)).toBe(false);
+  });
+
+  it('D44: the fridge for a raw-file row follows the history, and uses the first period before it starts', () => {
+    const hist = rebuildAssignments('TL-0417', [], changePointsFromRows(rows).get('TL-0417')!);
+    expect(fridgeForRow(hist, 'TL-0417', '2026-09-13T06:00')).toBe(WALK_IN); // before the first known period
+    expect(fridgeForRow(hist, 'TL-0417', '2026-09-16T06:00')).toBe(WALK_IN);
+    expect(fridgeForRow(hist, 'TL-0417', '2026-09-17T06:15')).toBe(DISPLAY_2);
+    expect(fridgeForRow(hist, 'TL-9999', '2026-09-17T06:15')).toBeNull(); // no history at all
   });
 
   it('re-importing an older week does not change the history', () => {

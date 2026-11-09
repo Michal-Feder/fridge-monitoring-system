@@ -32,9 +32,17 @@ export function ReportPage({ id, range }: { id: number; range: Partial<Range> })
 
   return (
     <section className="space-y-4">
-      <a href={href.fridge(id, range)} className="text-sm text-slate-600 underline underline-offset-2 print:hidden">
-        {s.back}
-      </a>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm print:hidden">
+        <a href={href.fridge(id, range)} className="text-slate-600 underline underline-offset-2">
+          {s.back}
+        </a>
+        {state.kind === 'ok' && (
+          // D46: the inspector visits a branch; this prints every fridge of it in one document
+          <a href={href.branchReport(state.data.fridge.branchId, state.data.range ?? range)} className="rounded-lg border border-slate-800 px-3 py-1.5 font-medium">
+            {s.wholeBranch(state.data.fridge.branch)}
+          </a>
+        )}
+      </div>
       {state.kind === 'ok' && state.data.range && <ReportForm id={id} range={state.data.range} branches={branches} />}
       {state.kind === 'loading' && <p className="text-slate-500">{strings.common.loading}</p>}
       {state.kind === 'error' && (
@@ -95,7 +103,8 @@ function ReportForm({ id, range, branches }: { id: number; range: Range; branche
   );
 }
 
-function ReportBody({ data }: { data: FridgeReport }) {
+/** One fridge's report; also used for every fridge of the branch report (D46). */
+export function ReportBody({ data }: { data: FridgeReport }) {
   const s = strings.report;
   const f = strings.fridge;
   const th = 'border-b border-slate-300 px-2 py-1.5 text-left font-semibold';

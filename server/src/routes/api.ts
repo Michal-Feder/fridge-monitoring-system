@@ -2,7 +2,7 @@
 import { Router } from 'express';
 import type { Db } from '../db/connection.ts';
 import { previewImport, confirmImport, type UploadFile, type Decisions } from '../services/importService.ts';
-import { dashboard, fridgeDetail, fridgeReport, search } from '../services/analysisService.ts';
+import { branchReport, dashboard, fridgeDetail, fridgeReport, search } from '../services/analysisService.ts';
 import { listBranches, createBranch, createFridge, updateFridge, listLoggers, setLoggerUnit, moveLogger } from '../services/setupService.ts';
 import { badRequest } from '../services/errors.ts';
 import { range, windowParam, numberParam, idParam, nowLocal } from './params.ts';
@@ -66,6 +66,10 @@ export function apiRouter(db: Db): Router {
 
   r.get('/branches', (_req, res) => {
     res.json(listBranches(db));
+  });
+  // D46: one printable document per branch, or "all" for every branch
+  r.get('/branches/:id/report', (req, res) => {
+    res.json(branchReport(db, req.params.id === 'all' ? 'all' : idParam(req.params.id), range(req.query)));
   });
   r.post('/branches', (req, res) => {
     const b = createBranch(db, req.body?.name);

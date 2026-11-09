@@ -21,6 +21,19 @@ export function fridgeAt(assignments: Assignment[], loggerId: string, ts: LocalT
   return a ? a.fridgeId : null;
 }
 
+/**
+ * D44: the fridge for one row of a raw logger file, from the logger's history. A row before the first known
+ * period uses the first period; a row in a hole between two closed periods uses the period before it.
+ * null only when the logger has no history at all.
+ */
+export function fridgeForRow(assignments: Assignment[], loggerId: string, ts: LocalTs): number | null {
+  const exact = fridgeAt(assignments, loggerId, ts);
+  if (exact !== null) return exact;
+  const periods = assignments.filter((a) => a.loggerId === loggerId).sort((a, b) => (a.validFrom < b.validFrom ? -1 : 1));
+  if (periods.length === 0) return null;
+  return (periods.filter((p) => p.validFrom <= ts).at(-1) ?? periods[0]).fridgeId;
+}
+
 /** Change points from rows that say which fridge each reading came from (Summer's sheet). */
 export function changePointsFromRows(rows: { loggerId: string; ts: LocalTs; fridgeId: number }[]): Map<string, ChangePoint[]> {
   const byLogger = new Map<string, { ts: LocalTs; fridgeId: number }[]>();

@@ -97,6 +97,40 @@ describe('import confirm', () => {
     expect(repo.logger(db, 'TL-0231')).toMatchObject({ unit: 'F', unit_confirmed: 1 });
   });
 
+  describe('a raw file that spans a logger move (D44)', () => {
+    // TL-0417: Walk-in until 17 Sep 06:00, Display 2 from then on (email sample history)
+    const raw: UploadFile = { name: 'TL-0417.csv', text: 'Time,Temp\n2026-09-15 06:00,4.0\n2026-09-16 06:00,4.1\n2026-09-17 06:15,3.9\n2026-09-18 06:00,3.8\n' };
+    const fridgeOf = (ts: string) =>
+      (db.prepare('SELECT f.name AS name FROM measurements m JOIN fridges f ON f.id = m.fridge_id WHERE m.logger_id = ? AND m.ts = ?').get('TL-0417', ts) as { name: string }).name;
+
+    it('puts each row in the fridge the logger history gives for its time', () => {
+      confirmImport(db, [EMAIL], EMAIL_UNITS, NOW);
+      const p = previewImport(db, [raw]);
+      expect(p.files[0].raw).toMatchObject({ fridgeSource: 'history', needsAssignment: false });
+      expect(p.files[0].raw!.split).toEqual([
+        { branch: 'Tel Aviv', fridge: 'Walk-in', from: '2026-09-15T06:00', to: '2026-09-16T06:00', rows: 2 },
+        { branch: 'Tel Aviv', fridge: 'Display 2', from: '2026-09-17T06:15', to: '2026-09-18T06:00', rows: 2 },
+      ]);
+      expect(confirmImport(db, [raw], {}, NOW)).toMatchObject({ ok: true, newRows: 4 });
+      expect(['2026-09-15T06:00', '2026-09-16T06:00', '2026-09-17T06:15', '2026-09-18T06:00'].map(fridgeOf)).toEqual(['Walk-in', 'Walk-in', 'Display 2', 'Display 2']);
+    });
+
+    it('rows before the first known period use the first period', () => {
+      confirmImport(db, [EMAIL], EMAIL_UNITS, NOW);
+      const early: UploadFile = { name: 'TL-0417.csv', text: 'Time,Temp\n2026-09-13 06:00,4.0\n2026-09-13 06:15,4.1\n' };
+      expect(previewImport(db, [early]).files[0].raw!.split).toEqual([{ branch: 'Tel Aviv', fridge: 'Walk-in', from: '2026-09-13T06:00', to: '2026-09-13T06:15', rows: 2 }]);
+    });
+
+    it('a fridge chosen by the user wins for every row, with a warning where the history disagrees', () => {
+      confirmImport(db, [EMAIL], EMAIL_UNITS, NOW);
+      const p = previewImport(db, [raw], { raw: { 'TL-0417.csv': { branch: 'Tel Aviv', fridge: 'Walk-in' } } });
+      expect(p.files[0].raw).toMatchObject({ fridgeSource: 'decision', split: [{ fridge: 'Walk-in', rows: 4 }] });
+      expect(p.files[0].warnings.join(' ')).toMatch(
+        /You chose Tel Aviv \/ Walk-in for all 4 rows, but the logger history puts 2 of them in Tel Aviv \/ Display 2 \(17 Sep 2026 06:15 to 18 Sep 2026 06:00\)/,
+      );
+    });
+  });
+
   it('is idempotent: confirming the same file again leaves an identical DB', () => {
     confirmImport(db, [EMAIL], EMAIL_UNITS, NOW);
     const first = snapshot(db);
