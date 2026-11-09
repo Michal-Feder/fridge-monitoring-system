@@ -4,7 +4,7 @@ import { typicalInterval, findGaps } from './gaps.ts';
 import { findExcursions, type SeriesPoint } from './events.ts';
 import { evaluateTrend, firstWarning } from './trend.ts';
 import { analyzeFridge, type Reading } from './analyze.ts';
-import { changePointsFromRows, rebuildAssignments, fridgeAt, hasOverlap } from './assignments.ts';
+import { changePointsFromRows, rebuildAssignments, fridgeAt, hasOverlap, sameAssignments } from './assignments.ts';
 import { inspectorReport } from './report.ts';
 import { toMinutes, fromMinutes } from './time.ts';
 
@@ -220,6 +220,14 @@ describe('assignments (D1, D25) - TL-0417 moved Walk-in -> Display 2', () => {
     const hist = rebuildAssignments('TL-0417', [], changePointsFromRows(rows).get('TL-0417')!);
     const again = rebuildAssignments('TL-0417', hist, changePointsFromRows(rows.slice(0, 2)).get('TL-0417')!);
     expect(again).toEqual(hist);
+  });
+
+  it('tells an unchanged history from a changed one, so the DB is only rewritten when needed', () => {
+    const hist = rebuildAssignments('TL-0417', [], changePointsFromRows(rows).get('TL-0417')!);
+    expect(sameAssignments(hist, hist.map((a) => ({ ...a })))).toBe(true);
+    expect(sameAssignments(hist, hist.slice(0, 1))).toBe(false);
+    expect(sameAssignments(hist, [hist[0], { ...hist[1], validFrom: '2026-09-17T06:15' }])).toBe(false);
+    expect(sameAssignments(hist, [hist[0], { ...hist[1], fridgeId: WALK_IN }])).toBe(false);
   });
 });
 

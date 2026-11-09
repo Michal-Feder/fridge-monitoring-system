@@ -122,3 +122,18 @@ export function counts(db: Db): Row {
   return one<Row>(db, `SELECT (SELECT COUNT(*) FROM measurements) AS measurements, (SELECT COUNT(*) FROM fridges) AS fridges,
     (SELECT COUNT(*) FROM branches) AS branches, (SELECT COUNT(*) FROM loggers) AS loggers, (SELECT COUNT(*) FROM logger_assignments) AS assignments`)!;
 }
+
+// --- setup (branches, fridges, loggers) ---
+export const branch = (db: Db, id: number) => one<BranchRow>(db, 'SELECT id, name FROM branches WHERE id = ?', id);
+/** names are COLLATE NOCASE in the schema, so "tel aviv" finds "Tel Aviv" */
+export const branchByName = (db: Db, name: string) => one<BranchRow>(db, 'SELECT id, name FROM branches WHERE name = ?', name);
+export const fridgeByName = (db: Db, branchId: number, name: string) =>
+  one<FridgeRow>(db, 'SELECT f.id, f.branch_id, b.name AS branch, f.name, f.max_temp, f.min_temp FROM fridges f JOIN branches b ON b.id = f.branch_id WHERE f.branch_id = ? AND f.name = ?', branchId, name);
+
+export function insertFridge(db: Db, branchId: number, name: string, maxTemp: number): number {
+  return Number(db.prepare('INSERT INTO fridges(branch_id, name, max_temp) VALUES (?, ?, ?)').run(branchId, name, maxTemp).lastInsertRowid);
+}
+
+export function loggerStats(db: Db): { logger_id: string; readings: number; last_ts: string }[] {
+  return all(db, 'SELECT logger_id, COUNT(*) AS readings, MAX(ts) AS last_ts FROM measurements GROUP BY logger_id');
+}

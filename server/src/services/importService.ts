@@ -10,7 +10,7 @@ import { suggestUnit, toCelsius, type Unit, type UnitSuggestion } from '../core/
 import { rowKey, markConflicts } from '../core/dedupe.ts';
 import { valueKey } from '../core/parseTemp.ts';
 import { typicalInterval, findGaps } from '../core/gaps.ts';
-import { fridgeAt, changePointsFromRows, rebuildAssignments, type Assignment } from '../core/assignments.ts';
+import { fridgeAt, changePointsFromRows, rebuildAssignments, sameAssignments } from '../core/assignments.ts';
 import { toMinutes, fromMinutes } from '../core/time.ts';
 
 export interface UploadFile { name: string; text: string }
@@ -296,10 +296,6 @@ function plan(db: Db, files: UploadFile[], decisions: Decisions = {}): Plan {
     units,
     parsed,
   };
-}
-
-function sameAssignments(a: Assignment[], b: Assignment[]): boolean {
-  return a.length === b.length && a.every((x, i) => x.fridgeId === b[i].fridgeId && x.validFrom === b[i].validFrom && x.validTo === b[i].validTo);
 }
 
 export function previewImport(db: Db, files: UploadFile[], decisions: Decisions = {}): PreviewResult {

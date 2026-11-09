@@ -1,10 +1,9 @@
-// Every fridge's status as the dashboard will show it (7-day window, "now" = latest reading, D22).
-// Used to check the seed against its stories. Step 8's analysis service takes over this job for the API.
+// Every fridge's status as the dashboard shows it (7-day window, "now" = latest reading, D22), plus the
+// first warm-up warning from the fridge page. Printed after seeding and asserted in seed.test.ts.
 import type { Db } from '../db/connection.ts';
 import * as repo from '../db/repo.ts';
-import { analyzeFridge } from '../core/analyze.ts';
-import { currentLogger } from '../core/assignments.ts';
-import { toMinutes, fromMinutes, type LocalTs } from '../core/time.ts';
+import { fridgeDetail } from '../services/analysisService.ts';
+import type { LocalTs } from '../core/time.ts';
 import type { Level } from '../core/status.ts';
 
 export interface StatusRow {
@@ -17,31 +16,18 @@ export interface StatusRow {
 }
 
 export function statusTable(db: Db): { asOf: LocalTs | null; rows: StatusRow[] } {
-  const asOf = repo.asOf(db);
-  if (!asOf) return { asOf: null, rows: [] };
-  const windowStart = fromMinutes(toMinutes(asOf) - 7 * 1440);
-  const history = repo.assignments(db);
   const rows = repo.fridges(db).map((f) => {
-    const loggerId = currentLogger(history, f.id);
-    const a = analyzeFridge({
-      readings: repo.readings(db, f.id, '0000-01-01T00:00', asOf),
-      threshold: f.max_temp,
-      asOf,
-      windowStart,
-      hasLogger: loggerId !== null,
-      currentLoggerId: loggerId,
-      warningScan: { from: windowStart, to: asOf },
-    });
+    const d = fridgeDetail(db, f.id);
     return {
       branch: f.branch,
       fridge: f.name,
-      level: a.level,
-      reasons: a.reasons.map((r) => `${r.level}:${r.code}`),
-      firstWarning: a.firstWarning,
-      firstAbove: a.eventsInWindow[0]?.firstHigh ?? null,
+      level: d.status.level,
+      reasons: d.status.reasons.map((r) => `${r.level}:${r.code}`),
+      firstWarning: d.firstWarning,
+      firstAbove: d.events[0]?.firstHigh ?? null,
     };
   });
-  return { asOf, rows };
+  return { asOf: repo.asOf(db), rows };
 }
 
 export function formatStatusTable(t: ReturnType<typeof statusTable>): string {

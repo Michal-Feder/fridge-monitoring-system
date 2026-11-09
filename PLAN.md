@@ -8,8 +8,8 @@
 - [x] dedupe - [x] gaps - [x] events - [x] trend - [x] status - [x] assignments - [x] report - [x] analyze - [x] email sample end to end
 
 ## C DB + import + seed + API
-- [x] schema.sql - [x] import preview / confirm (idempotent) - [x] seed + sample-data - [ ] dashboard - [ ] fridge - [ ] report
-- [ ] search - [ ] PATCH fridge - [ ] CRUD-lite
+- [x] schema.sql - [x] import preview / confirm (idempotent) - [x] seed + sample-data - [x] dashboard - [x] fridge - [x] report
+- [x] search - [x] PATCH fridge - [x] CRUD-lite
 
 ## D client
 - [ ] dashboard - [ ] upload + preview - [ ] fridge chart - [ ] inspector report + print - [ ] search - [ ] setup - [ ] check at 375px

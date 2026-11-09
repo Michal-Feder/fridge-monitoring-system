@@ -68,3 +68,8 @@ export function hasOverlap(assignments: Assignment[]): boolean {
 export function currentLogger(assignments: Assignment[], fridgeId: number): string | null {
   return assignments.find((a) => a.fridgeId === fridgeId && a.validTo === null)?.loggerId ?? null;
 }
+
+/** True when two histories have the same periods, so the stored one need not be rewritten (row ids stay). */
+export function sameAssignments(a: Assignment[], b: Assignment[]): boolean {
+  return a.length === b.length && a.every((x, i) => x.loggerId === b[i].loggerId && x.fridgeId === b[i].fridgeId && x.validFrom === b[i].validFrom && x.validTo === b[i].validTo);
+}
