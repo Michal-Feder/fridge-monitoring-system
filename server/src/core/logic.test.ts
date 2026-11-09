@@ -299,8 +299,49 @@ describe('inspector report', () => {
       fridgeLabel: 'Jerusalem / Dairy', threshold: 5, from: '2026-09-14T00:00', to: '2026-09-14T23:59', events: [],
       gaps: [{ from: '2026-09-14T06:15', to: '2026-09-14T08:30', minutes: 135 }], readings: 3, errors: 0, conflicts: 0,
       firstReading: '2026-09-14T06:00', lastReading: '2026-09-14T08:30', fahrenheitLoggers: [], loggerPeriods: [],
+      dataEnd: null, gapLimitMin: 37.5,
     });
     expect(r.headline).toMatch(/did not go above 5.0 °C/);
     expect(r.notes.join(' ')).toMatch(/2 h 15 min.*unknown/);
+  });
+
+  // D40: Haifa / Dairy in the email-only DB has 3 readings on 14 Sep 06:00-06:30; the latest data is 17 Sep 06:00.
+  const haifa = {
+    fridgeLabel: 'Haifa / Dairy', threshold: 5, from: '2026-09-10T00:00', to: '2026-09-17T23:59', events: [], gaps: [],
+    readings: 3, errors: 1, conflicts: 0, firstReading: '2026-09-14T06:00', lastReading: '2026-09-14T06:30',
+    fahrenheitLoggers: ['TL-0231'], loggerPeriods: [], dataEnd: '2026-09-17T06:00', gapLimitMin: 37.5,
+  };
+
+  it('D40: time before the first and after the last reading is missing data, not "did not go above"', () => {
+    const r = inspectorReport(haifa);
+    // 10 Sep 00:00 -> 17 Sep 06:00 (latest data) = 7 days 6 h; only 30 min of it has readings
+    expect(r.headline).toBe(
+      'In the recorded readings (14 Sep 2026 06:00 to 06:30) Haifa / Dairy did not go above 5.0 °C. ' +
+        'There are no readings for 7 days 5 h of the 7 days 6 h in this period, so we cannot say what happened then.',
+    );
+    expect(r.coverage).toEqual({
+      periodMinutes: 7 * 1440 + 360,
+      missingMinutes: 7 * 1440 + 330,
+      percent: 0.3,
+      uncovered: [
+        { from: '2026-09-10T00:00', to: '2026-09-14T06:00', minutes: 4 * 1440 + 360 },
+        { from: '2026-09-14T06:30', to: '2026-09-17T06:00', minutes: 2 * 1440 + 1410 },
+      ],
+    });
+    const notes = r.notes.join('\n');
+    expect(notes).toMatch(/No readings from 10 Sep 2026 00:00 to 14 Sep 2026 06:00 \(4 days 6 h\), before the first reading/);
+    expect(notes).toMatch(/No readings from 14 Sep 2026 06:30 to 17 Sep 2026 06:00 \(2 days 23 h\), after the last reading/);
+    expect(notes).toMatch(/0\.3% of the period/);
+    expect(notes).toMatch(/latest uploaded data ends at 17 Sep 2026 06:00/);
+  });
+
+  it('D40: a short start or end (within the gap limit) is not missing, and full coverage keeps the plain headline', () => {
+    const r = inspectorReport({
+      ...haifa, from: '2026-09-14T06:00', to: '2026-09-14T06:45', readings: 3, errors: 0, fahrenheitLoggers: [],
+      firstReading: '2026-09-14T06:15', lastReading: '2026-09-14T06:45', dataEnd: '2026-09-17T06:00',
+    });
+    expect(r.coverage.uncovered).toEqual([]);
+    expect(r.coverage.percent).toBe(100);
+    expect(r.headline).toBe('Haifa / Dairy did not go above 5.0 °C in any recorded reading between 14 Sep 2026 06:00 and 14 Sep 2026 06:45.');
   });
 });

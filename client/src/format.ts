@@ -17,6 +17,18 @@ export function fmtMinutesTs(min: number, withYear = false): string {
   return fmtTs(`${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}T${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`, withYear);
 }
 
+/** Local wall-clock string -> minutes since 1970 on that clock (same scale as server core/time.ts). Uses
+ *  Date.UTC on the parts, never new Date(localString), so the browser's timezone cannot shift it. */
+export function tsToMinutes(ts: string): number {
+  const [date, time] = ts.split('T');
+  const [y, mo, d] = date.split('-').map(Number);
+  const [h, mi] = time.split(':').map(Number);
+  return Date.UTC(y, mo - 1, d, h, mi) / 60000;
+}
+
+/** "2026-09-14T06:00" -> "2026-09-14" for <input type="date"> */
+export const tsDate = (ts: string) => ts.slice(0, 10);
+
 /** "45 min", "2 h 15 min", "1 day 3 h" (same wording as the server report) */
 export function fmtDuration(minutes: number): string {
   const m = Math.round(minutes);

@@ -13,3 +13,23 @@ body {
   background-color: var(--color-slate-50);
   color: var(--color-slate-900);
 }
+
+/* Inspector report on paper: black on white, no app chrome (the header and forms carry print:hidden),
+   rows of a table never split across pages. */
+@media print {
+  @page {
+    margin: 15mm;
+  }
+  body {
+    background: white;
+    color: black;
+    font-size: 11pt;
+  }
+  .report tr,
+  .report li {
+    break-inside: avoid;
+  }
+  .report h3 {
+    break-after: avoid;
+  }
+}

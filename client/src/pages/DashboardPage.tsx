@@ -4,6 +4,7 @@ import { strings } from '../strings.ts';
 import { fmtTemp, fmtTs } from '../format.ts';
 import { FridgeCard } from '../components/FridgeCard.tsx';
 import { StatusIcon } from '../components/Status.tsx';
+import { href } from '../router.ts';
 
 const WINDOW_KEY = 'fridge-watch.window';
 
@@ -154,7 +155,9 @@ function DashboardBody({ data }: { data: Dashboard }) {
             <ul className="border-t border-slate-100 bg-slate-50 px-3 py-2 text-sm">
               {list.map((f) => (
                 <li key={f.id} className="flex justify-between gap-2 py-1">
-                  <span>{f.name}</span>
+                  <a href={href.fridge(f.id)} className="underline decoration-slate-300 underline-offset-2 hover:decoration-slate-800">
+                    {f.name}
+                  </a>
                   <span className="text-slate-500">
                     {f.lastReading ? `${fmtTemp(f.lastReading.tempC)} · ${fmtTs(f.lastReading.ts)}` : s.noReading}
                   </span>

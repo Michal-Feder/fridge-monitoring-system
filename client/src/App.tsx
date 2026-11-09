@@ -1,9 +1,11 @@
 import { strings } from './strings.ts';
-import { href, useRoute, type Route } from './router.ts';
+import { href, useRoute } from './router.ts';
 import { DashboardPage } from './pages/DashboardPage.tsx';
 import { UploadPage } from './pages/UploadPage.tsx';
+import { FridgePage } from './pages/FridgePage.tsx';
+import { ReportPage } from './pages/ReportPage.tsx';
 
-const NAV: { page: Route['page']; href: string; label: string }[] = [
+const NAV: { page: 'dashboard' | 'upload'; href: string; label: string }[] = [
   { page: 'dashboard', href: href.dashboard, label: strings.nav.dashboard },
   { page: 'upload', href: href.upload, label: strings.nav.upload },
 ];
@@ -12,7 +14,7 @@ export default function App() {
   const route = useRoute();
   return (
     <div className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white">
+      <header className="border-b border-slate-200 bg-white print:hidden">
         <div className="mx-auto flex max-w-4xl items-center gap-2 px-4 py-2">
           <h1 className="shrink-0 whitespace-nowrap text-lg font-bold">{strings.appName}</h1>
           {/* the tagline gives way first: on a phone the navigation matters more */}
@@ -31,7 +33,17 @@ export default function App() {
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-4xl px-4 py-4">{route.page === 'upload' ? <UploadPage /> : <DashboardPage />}</main>
+      <main className="mx-auto max-w-4xl px-4 py-4 print:max-w-none print:p-0">
+        {route.page === 'upload' ? (
+          <UploadPage />
+        ) : route.page === 'fridge' ? (
+          <FridgePage key={route.id} id={route.id} range={route.range} />
+        ) : route.page === 'report' ? (
+          <ReportPage key={route.id} id={route.id} range={route.range} />
+        ) : (
+          <DashboardPage />
+        )}
+      </main>
     </div>
   );
 }

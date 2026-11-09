@@ -123,7 +123,96 @@ export interface ConfirmResult {
   files: { name: string; newRows: number; alreadyInDb: number; skipped: number }[];
 }
 
+// --- fridge page and report (server/src/services/analysisService.ts, core/analyze.ts, core/report.ts)
+export interface Range {
+  from: string;
+  to: string;
+}
+export interface FridgeInfo {
+  id: number;
+  branchId: number;
+  branch: string;
+  name: string;
+  maxTemp: number;
+  minTemp: number | null;
+}
+export type EventClass = 'spike' | 'unverified' | 'sustained' | 'ongoing';
+export interface EventView {
+  firstHigh: string;
+  lastHigh: string;
+  prevOk: string | null;
+  nextOk: string | null;
+  minMinutes: number;
+  /** null when unknown (gap, data starts above, still ongoing) */
+  maxMinutes: number | null;
+  durationKnown: boolean;
+  ongoing: boolean;
+  startsAtDataStart: boolean;
+  gapInside: boolean;
+  gapBefore: boolean;
+  gapAfter: boolean;
+  class: EventClass;
+  peak: number;
+  readingsAbove: number;
+  errorsInside: number;
+  conflictsInside: number;
+}
+export interface GapView {
+  from: string;
+  to: string;
+  minutes: number;
+}
+export interface ChartReading {
+  ts: string;
+  tempC: number | null;
+  status: 'ok' | 'error' | 'conflict';
+  loggerId: string;
+  originalValue: string;
+  originalUnit: Unit;
+}
+export interface LoggerPeriod {
+  loggerId: string;
+  unit: Unit | null;
+  validFrom: string;
+  validTo: string | null;
+}
+export interface FridgeDetail {
+  fridge: FridgeInfo;
+  asOf: string | null;
+  range: Range | null;
+  status: { level: Level; reasons: Reason[] };
+  currentLogger: string | null;
+  readings: ChartReading[];
+  events: EventView[];
+  gaps: GapView[];
+  trend: { state: string; recentMean: number | null; baseline: number | null; delta: number | null; slopePerHour: number | null } | null;
+  firstWarning: string | null;
+  quality: { readings: number; errors: number; conflicts: number; gaps: number; typicalIntervalByLogger: Record<string, number | null> };
+  loggerHistory: LoggerPeriod[];
+}
+export interface FridgeReport {
+  fridge: FridgeInfo;
+  range: Range | null;
+  report: {
+    headline: string;
+    sentences: string[];
+    notes: string[];
+    /** D40: how much of the period has readings (period ends at the latest data if earlier) */
+    coverage: { periodMinutes: number; missingMinutes: number; percent: number; uncovered: GapView[] };
+  };
+  events: EventView[];
+  gaps: GapView[];
+}
+
 // --- setup (server/src/services/setupService.ts)
+export interface LoggerInfo {
+  id: string;
+  unit: Unit;
+  unitConfirmed: boolean;
+  currentFridge: { id: number; label: string | null; since: string } | null;
+  readings: number;
+  lastReading: string | null;
+}
 export interface BranchInfo {
   id: number;
   name: string;
@@ -131,6 +220,13 @@ export interface BranchInfo {
 }
 
 export class ApiError extends Error {}
+
+/** Text to show for a failed call. The server's error messages are written for people (e.g. "Max temperature
+ *  must be a number between -30 and 30 °C."), so they are shown as they are. */
+export function errorMessage(e: unknown, strings: { offline: string; error: (m: string) => string }): string {
+  if (e instanceof ApiError) return e.message === 'offline' ? strings.offline : e.message;
+  return strings.error(String((e as Error)?.message ?? e));
+}
 
 /** `accept` lists non-2xx statuses whose JSON body is a normal answer (confirm answers 422 with what is missing). */
 async function request<T>(url: string, init?: RequestInit, accept: number[] = []): Promise<T> {
@@ -145,11 +241,24 @@ async function request<T>(url: string, init?: RequestInit, accept: number[] = []
   return body as T;
 }
 
-const postJson = (body: unknown): RequestInit => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const json = (method: string, body: unknown): RequestInit => ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const postJson = (body: unknown) => json('POST', body);
+const rangeQuery = (r?: Partial<Range>) => {
+  const q = new URLSearchParams();
+  if (r?.from) q.set('from', r.from);
+  if (r?.to) q.set('to', r.to);
+  const s = q.toString();
+  return s ? `?${s}` : '';
+};
 
 export const api = {
   dashboard: (window: Window) => request<Dashboard>(`/api/dashboard?window=${window}`),
   branches: () => request<BranchInfo[]>('/api/branches'),
   preview: (files: UploadFile[], decisions: Decisions) => request<PreviewResult>('/api/imports/preview', postJson({ files, decisions })),
   confirm: (files: UploadFile[], decisions: Decisions) => request<ConfirmResult>('/api/imports/confirm', postJson({ files, decisions }), [422]),
+  fridge: (id: number, range?: Partial<Range>) => request<FridgeDetail>(`/api/fridges/${id}${rangeQuery(range)}`),
+  report: (id: number, range?: Partial<Range>) => request<FridgeReport>(`/api/fridges/${id}/report${rangeQuery(range)}`),
+  setMaxTemp: (id: number, maxTemp: string) => request<FridgeInfo>(`/api/fridges/${id}`, json('PATCH', { maxTemp })),
+  loggers: () => request<LoggerInfo[]>('/api/loggers'),
+  setLoggerUnit: (id: string, unit: Unit) => request<{ loggerId: string; unit: Unit; recomputed: number }>(`/api/loggers/${encodeURIComponent(id)}`, json('PATCH', { unit })),
 };

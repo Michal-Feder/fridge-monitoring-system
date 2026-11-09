@@ -1,6 +1,7 @@
 import type { DashboardFridge, Level } from '../api.ts';
 import { strings } from '../strings.ts';
 import { StatusBadge } from './Status.tsx';
+import { href } from '../router.ts';
 
 const CARD: Record<Level, string> = {
   red: 'border-l-8 border-red-600 bg-white',
@@ -17,11 +18,16 @@ export function FridgeCard({ fridge }: { fridge: DashboardFridge }) {
   // the colour-giving reasons first, info (spikes, conflicts) after
   const reasons = [...fridge.reasons].sort((a, b) => Number(a.level === 'info') - Number(b.level === 'info'));
   return (
-    <article className={`rounded-lg p-3 shadow-sm ${CARD[fridge.level]}`} aria-label={`${fridge.branch} / ${fridge.name}: ${strings.level[fridge.level]}`}>
+    <article className={`relative rounded-lg p-3 shadow-sm ${CARD[fridge.level]}`} aria-label={`${fridge.branch} / ${fridge.name}: ${strings.level[fridge.level]}`}>
       <header className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{fridge.branch}</p>
-          <h3 className="truncate text-base font-semibold">{fridge.name}</h3>
+          <h3 className="truncate text-base font-semibold">
+            {/* the whole card is clickable through this link's ::after overlay */}
+            <a href={href.fridge(fridge.id)} className="after:absolute after:inset-0 hover:underline">
+              {fridge.name}
+            </a>
+          </h3>
         </div>
         <StatusBadge level={fridge.level} />
       </header>

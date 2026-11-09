@@ -5,6 +5,7 @@ import * as repo from '../db/repo.ts';
 import type { FridgeRow } from '../db/repo.ts';
 import { analyzeFridge, type FridgeAnalysis, type EventView, type GapView } from '../core/analyze.ts';
 import { inspectorReport, type Report } from '../core/report.ts';
+import { gapLimit } from '../core/gaps.ts';
 import { currentLogger, type Assignment } from '../core/assignments.ts';
 import { toMinutes, fromMinutes, type LocalTs } from '../core/time.ts';
 import { levelRank, type Level, type Reason } from '../core/status.ts';
@@ -158,7 +159,7 @@ export function fridgeReport(db: Db, id: number, range?: Partial<Range>): Fridge
   const label = `${f.branch} / ${f.name}`;
   const asOf = repo.asOf(db);
   if (!asOf) {
-    const report = inspectorReport({ fridgeLabel: label, threshold: f.max_temp, from: range?.from ?? '', to: range?.to ?? '', events: [], gaps: [], readings: 0, errors: 0, conflicts: 0, firstReading: null, lastReading: null, fahrenheitLoggers: [], loggerPeriods: [] });
+    const report = inspectorReport({ fridgeLabel: label, threshold: f.max_temp, from: range?.from ?? '', to: range?.to ?? '', events: [], gaps: [], readings: 0, errors: 0, conflicts: 0, firstReading: null, lastReading: null, fahrenheitLoggers: [], loggerPeriods: [], dataEnd: null, gapLimitMin: null });
     return { fridge: info(f), range: null, report, events: [], gaps: [] };
   }
   const r = resolveRange(asOf, range);
@@ -182,6 +183,9 @@ export function fridgeReport(db: Db, id: number, range?: Partial<Range>): Fridge
     loggerPeriods: history
       .filter((p) => p.fridgeId === id && p.validFrom <= r.to && (p.validTo === null || p.validTo > r.from))
       .map((p) => ({ loggerId: p.loggerId, from: p.validFrom, to: p.validTo })),
+    // D40: coverage is judged up to the latest data, with the most lenient gap limit of the fridge's loggers
+    dataEnd: asOf,
+    gapLimitMin: Math.max(0, ...Object.values(a.typicalIntervalByLogger).map((m) => gapLimit(m) ?? 0)) || null,
   });
   return { fridge: info(f), range: r, report, events: a.eventsInWindow, gaps };
 }

@@ -159,6 +159,104 @@ export const strings = {
     uploadMore: 'Upload more files',
   },
 
+  fridge: {
+    back: '← All fridges',
+    title: (branch: string, name: string) => `${branch} / ${name}`,
+    statusNow: 'Status now',
+    statusNowHint: (asOf: string) => `last 7 days up to ${fmtTs(asOf)}`,
+    range: 'Period',
+    from: 'From',
+    to: 'To',
+    show: 'Show',
+    last7: 'Last 7 days',
+    rangeShown: (from: string, to: string) => `${fmtTs(from)} to ${fmtTs(to)}`,
+    report: 'Inspector report',
+    noReadings: 'No readings in this period.',
+
+    chart: 'Temperature',
+    chartLabel: (name: string) => `Temperature chart for ${name}`,
+    legend: {
+      temp: 'Temperature (°C)',
+      limit: 'Limit',
+      excursion: 'Above the limit',
+      unverified: 'Above, length unknown',
+      spike: 'Short spike',
+      gap: 'Gap: no readings',
+      error: 'Error reading',
+      warning: 'Warm-up warning',
+    },
+    limitLabel: (max: number) => `limit ${fmtTemp(max)}`,
+    warningLabel: 'warm-up warning',
+    tooltipError: (original: string) => `Error reading ("${original}")`,
+    tooltipOriginal: (value: string, unit: string) => `logged as ${value} °${unit}`,
+    tooltipConflict: 'two values at this time; the higher one is used',
+
+    warning: (ts: string) => `The warm-up warning first fired at ${fmtTs(ts)}.`,
+
+    events: 'Times above the limit',
+    eventsNone: (max: number) => `Never above ${fmtTemp(max)} in this period.`,
+    eventClass: { spike: 'Short spike', unverified: 'Could not be verified', sustained: 'Too warm', ongoing: 'Still too warm' },
+    eventWhen: (e: { firstHigh: string; lastHigh: string; readingsAbove: number }) =>
+      e.readingsAbove === 1 ? `at ${fmtTs(e.firstHigh)}` : `${fmtTs(e.firstHigh)} to ${fmtTs(e.lastHigh)}`,
+    eventDuration: (e: { minMinutes: number; maxMinutes: number | null; ongoing: boolean; durationKnown: boolean; startsAtDataStart: boolean }) => {
+      if (e.ongoing) return `at least ${fmtDuration(e.minMinutes)}, still above at the last reading`;
+      if (!e.durationKnown) return `at least ${fmtDuration(e.minMinutes)}; exact length unknown (${e.startsAtDataStart ? 'the data starts while it was already above' : 'gap in the data'})`;
+      if (e.minMinutes === e.maxMinutes) return fmtDuration(e.minMinutes);
+      return `${fmtDuration(e.minMinutes)} to ${fmtDuration(e.maxMinutes ?? 0)}`;
+    },
+    eventPeak: (peak: number) => `peak ${fmtTemp(peak)}`,
+    eventBackAt: (ts: string) => `back to normal at ${fmtTs(ts)}`,
+    eventErrors: (n: number) => plural(n, 'error reading') + ' inside',
+
+    quality: 'Data quality',
+    qReadings: 'Readings',
+    qErrors: 'Error readings',
+    qConflicts: 'Conflicts',
+    qGaps: 'Gaps',
+    qInterval: (logger: string, min: number | null) => `${logger}: ${min === null ? 'interval unknown' : `every ${fmtDuration(min)}`}`,
+    gapLine: (from: string, to: string, minutes: number) => `${fmtTs(from)} to ${fmtTs(to)} (${fmtDuration(minutes)}): temperature unknown`,
+
+    threshold: 'Limit for this fridge',
+    thresholdHelp: 'Above this temperature counts as too warm (strictly above). Default 5.0 °C.',
+    thresholdSave: 'Save limit',
+    thresholdSaved: 'Saved.',
+    thresholdUnit: '°C',
+
+    loggers: 'Logger history',
+    loggersNone: 'No logger has been assigned to this fridge.',
+    period: (from: string, to: string | null) => (to ? `${fmtTs(from)} to ${fmtTs(to)}` : `since ${fmtTs(from)}`),
+    current: 'current',
+  },
+
+  loggerUnit: {
+    unit: (u: 'C' | 'F' | null) => (u ? `°${u}` : '—'),
+    change: 'Change unit',
+    to: (u: 'C' | 'F') => `Change to °${u}`,
+    confirmTitle: (id: string, from: 'C' | 'F', to: 'C' | 'F') => `Change ${id} from °${from} to °${to}?`,
+    confirmBody: (count: number | null) =>
+      `All ${count === null ? '' : `${count} `}readings of this logger, in every fridge it has been in, will be recomputed from the original values stored at upload. Nothing is lost: you can change it back.`,
+    confirmYes: (u: 'C' | 'F') => `Yes, recompute as °${u}`,
+    cancel: 'Cancel',
+    working: 'Recomputing…',
+    done: (n: number, u: 'C' | 'F') => `${plural(n, 'reading')} recomputed as °${u}.`,
+  },
+
+  report: {
+    title: 'Inspector report',
+    fridge: 'Fridge',
+    print: 'Print',
+    back: '← Fridge page',
+    period: (from: string, to: string) => `${fmtTs(from, true)} to ${fmtTs(to, true)}`,
+    events: 'Times above the limit',
+    eventsNone: 'None in this period.',
+    cols: { when: 'When', duration: 'How long', peak: 'Peak', kind: 'Kind' },
+    gaps: 'No readings (temperature unknown)',
+    coverage: (percent: number, missing: number) =>
+      percent >= 100 ? 'Readings cover the whole period.' : `Readings cover ${percent}% of the period; ${fmtDuration(missing)} has no readings.`,
+    cols2: { from: 'From', to: 'To', length: 'Length' },
+    notes: 'Reliability notes',
+  },
+
   /** One sentence per status reason (server core/status.ts codes). */
   reason: (r: Reason, maxTemp: number): string => {
     const p = r.params;
