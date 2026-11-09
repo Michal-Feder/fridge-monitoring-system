@@ -43,4 +43,33 @@ describe('units: Haifa TL-0231 is Fahrenheit, not x10', () => {
   it('returns low confidence when there are no numeric values', () => {
     expect(suggestUnit([])).toMatchObject({ unit: 'C', confidence: 'low', median: null });
   });
+
+  // D42: only °C and °F are supported; values that fit neither are not guessed at
+  it('tenths of a degree as whole numbers (38, 39, 41) still suggest °F, but with low confidence and a tenths hint', () => {
+    const s = suggestUnit([38, 39, 41]);
+    expect(s).toMatchObject({ unit: 'F', confidence: 'low', median: 39 });
+    expect(s.reason).toMatch(/whole numbers/);
+    expect(s.reason).toMatch(/tenths of a degree/);
+    expect(s.reason).toMatch(/39 would mean 3\.9 °C/);
+    // real °F readings with decimals stay confident
+    expect(suggestUnit([38.3, 39.0, 38.6])).toMatchObject({ unit: 'F', confidence: 'high' });
+  });
+
+  it('Kelvin-like values (276, 277) fit neither °C nor °F: no usable suggestion', () => {
+    const s = suggestUnit([276, 277]);
+    expect(s).toEqual({
+      unit: null,
+      confidence: 'none',
+      median: 276.5,
+      reason: 'Neither °C nor °F fits these values (median 276.5). Check the file: it may use another format such as tenths of a degree.',
+    });
+    // a header saying °C or °F does not make the values fit
+    expect(suggestUnit([276, 277], 'C')).toMatchObject({ unit: null, confidence: 'none' });
+    expect(suggestUnit([276, 277], 'F')).toMatchObject({ unit: null, confidence: 'none' });
+  });
+
+  it('the -30..30 °C fit is the limit: 86 °F (30 °C) still fits, 87 °F does not', () => {
+    expect(suggestUnit([86, 86]).unit).toBe('F');
+    expect(suggestUnit([87, 87]).unit).toBeNull();
+  });
 });

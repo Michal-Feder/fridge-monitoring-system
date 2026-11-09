@@ -240,7 +240,8 @@ function plan(db: Db, files: UploadFile[], decisions: Decisions = {}): Plan {
     const suggestion = suggestUnit(list.filter((r) => r.value !== null).map((r) => r.value!), hint);
     const confirmed = !!known?.unit_confirmed;
     const decided = decisions.units?.[loggerId];
-    const unit: Unit = decided ?? (confirmed ? known!.unit : suggestion.unit);
+    // suggestion.unit is null when the values fit no unit (D42); that logger blocks saving, so 'C' is never stored
+    const unit: Unit = decided ?? (confirmed ? known!.unit : (suggestion.unit ?? 'C'));
     units.set(loggerId, { unit, decided: !!decided || confirmed });
     const times = list.map((r) => toMinutes(r.ts));
     const typical = typicalInterval(times);
@@ -284,7 +285,11 @@ function plan(db: Db, files: UploadFile[], decisions: Decisions = {}): Plan {
 
   const blocking: string[] = [];
   for (const s of summaries) if (s.raw?.needsAssignment) blocking.push(`${s.name}: choose ${s.raw.loggerId ? '' : 'the logger id, '}branch and fridge.`);
-  for (const l of loggerSummaries) if (l.needsUnitDecision && !decisions.units?.[l.loggerId]) blocking.push(`${l.loggerId}: confirm the unit (°C or °F).`);
+  for (const l of loggerSummaries) {
+    // D42: values that fit neither unit block saving even when a unit was chosen or confirmed before
+    if (l.suggestion.unit === null) blocking.push(`${l.loggerId}: these values fit neither °C nor °F (median ${l.suggestion.median?.toFixed(1)}). Fix the file before saving; it may be in tenths of a degree or another unit.`);
+    else if (l.needsUnitDecision && !decisions.units?.[l.loggerId]) blocking.push(`${l.loggerId}: confirm the unit (°C or °F).`);
+  }
   if (rows.length === 0 && summaries.every((s) => !s.raw?.needsAssignment)) blocking.push('No readable rows in these files.');
 
   const sum = (k: keyof FileSummary) => summaries.reduce((a, s) => a + (s[k] as number), 0);

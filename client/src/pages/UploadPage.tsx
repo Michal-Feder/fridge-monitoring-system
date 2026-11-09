@@ -85,7 +85,8 @@ export function UploadPage() {
 
   if (result) return <SavedResult result={result} onMore={reset} />;
 
-  const unitLoggers = preview?.loggers.filter((l) => l.needsUnitDecision) ?? [];
+  // a logger whose values fit no unit is shown even when its unit was confirmed earlier: it blocks saving (D42)
+  const unitLoggers = preview?.loggers.filter((l) => l.needsUnitDecision || l.suggestion.unit === null) ?? [];
   const assignFiles = preview?.files.filter((f) => f.ok && f.raw && (f.raw.needsAssignment || f.raw.fridgeSource === 'decision')) ?? [];
   // the preview shown belongs to the current files only when it lists exactly them
   const current = preview !== null && preview.files.length === files.length && files.every((f) => preview.files.some((p) => p.name === f.name));

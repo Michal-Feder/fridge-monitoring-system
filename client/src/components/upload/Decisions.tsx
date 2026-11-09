@@ -7,6 +7,17 @@ import { keepUnits } from '../../format.ts';
 export function UnitDecision({ logger, chosen, onChoose }: { logger: LoggerSummary; chosen: Unit | undefined; onChoose: (u: Unit) => void }) {
   const s = strings.upload;
   const sug = logger.suggestion;
+  if (sug.unit === null) {
+    // D42: neither unit fits; offering °C / °F here would invite a wrong guess, so the file has to be fixed
+    return (
+      <div className="rounded-lg border-2 border-red-500 bg-red-50 p-3" role="alert">
+        <p className="font-semibold text-red-900">{s.unitNoFit(logger.loggerId)}</p>
+        {logger.fridges.length > 0 && <p className="text-sm text-slate-600">{s.loggerIn(logger.fridges)}</p>}
+        <p className="mt-1 text-sm text-red-900">{keepUnits(sug.reason)}</p>
+        <p className="mt-1 text-xs text-slate-600">{s.unitNoFitHelp}</p>
+      </div>
+    );
+  }
   return (
     <fieldset className={`rounded-lg border-2 bg-white p-3 ${chosen ? 'border-slate-200' : 'border-amber-400'}`}>
       <legend className="px-1 font-semibold">

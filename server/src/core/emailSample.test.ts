@@ -15,7 +15,13 @@ const rows = file.rows.map((r) => ({ ...r, loggerId: r.loggerId!, branch: branch
 const loggers = [...new Set(rows.map((r) => r.loggerId))];
 const suggested = Object.fromEntries(loggers.map((l) => [l, suggestUnit(rows.filter((r) => r.loggerId === l && r.value !== null).map((r) => r.value!))]));
 // the human confirms the suggestion once per logger (D3)
-const unit: Record<string, Unit> = Object.fromEntries(loggers.map((l) => [l, suggested[l].unit]));
+const unit: Record<string, Unit> = Object.fromEntries(
+  loggers.map((l) => {
+    const u = suggested[l].unit;
+    if (u === null) throw new Error(`${l}: no usable unit suggestion (D42); the email sample should always fit °C or °F`);
+    return [l, u];
+  }),
+);
 const { rows: unique, exactDuplicates, conflicts } = dedupe(rows);
 const readings = unique.map((r) => ({ ...r, tempC: r.value === null ? null : toCelsius(r.value, unit[r.loggerId]) }));
 

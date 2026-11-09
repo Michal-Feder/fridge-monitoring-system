@@ -50,7 +50,8 @@ export interface LoggerSummary {
   rows: number;
   firstTs: string;
   lastTs: string;
-  suggestion: { unit: Unit; confidence: 'high' | 'low'; reason: string; median: number | null };
+  /** unit null + confidence 'none': the values fit neither °C nor °F; saving is blocked until the file is fixed (D42) */
+  suggestion: { unit: Unit | null; confidence: 'high' | 'low' | 'none'; reason: string; median: number | null };
   currentUnit: Unit | null;
   unitConfirmed: boolean;
   needsUnitDecision: boolean;

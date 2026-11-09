@@ -2,8 +2,9 @@
 export type Unit = 'C' | 'F';
 
 export interface UnitSuggestion {
-  unit: Unit;
-  confidence: 'high' | 'low';
+  /** null: the values fit neither °C nor °F (D42); the file has to be fixed, no unit can be chosen */
+  unit: Unit | null;
+  confidence: 'high' | 'low' | 'none';
   reason: string;
   median: number | null;
 }
@@ -25,6 +26,9 @@ export function median(values: number[]): number | null {
 // A median above 20 cannot be a working fridge in °C, but it is normal in °F.
 const F_MEDIAN_MIN = 20;
 const F_TYPICAL_RANGE: [number, number] = [25, 60];
+/** D42: a cold-room logger reads within this range in °C, whatever its unit. Same range as a fridge limit (D34). */
+const PLAUSIBLE_C: [number, number] = [-30, 30];
+const plausible = (c: number) => c >= PLAUSIBLE_C[0] && c <= PLAUSIBLE_C[1];
 
 /**
  * Suggest the unit of a logger from its readings. The median is used so that a few hot readings
@@ -32,12 +36,19 @@ const F_TYPICAL_RANGE: [number, number] = [25, 60];
  * `headerHint` comes from a column header such as "Temp (°F)".
  */
 export function suggestUnit(values: number[], headerHint?: Unit | null): UnitSuggestion {
-  const m = median(values.filter((v) => Number.isFinite(v)));
+  const nums = values.filter((v) => Number.isFinite(v));
+  const m = median(nums);
   const fmt = (n: number) => n.toFixed(1);
 
   if (m === null) {
     if (headerHint) return { unit: headerHint, confidence: 'low', reason: `Column header says °${headerHint}; no numeric readings to check it against.`, median: null };
     return { unit: 'C', confidence: 'low', reason: 'No numeric readings; assuming Celsius.', median: null };
+  }
+
+  // D42: only °C and °F are supported. Kelvin (276) or a tenths export of a warm room is not guessed at,
+  // whatever a header says: the values themselves cannot be a cold room in either unit.
+  if (!plausible(m) && !plausible(toCelsius(m, 'F'))) {
+    return { unit: null, confidence: 'none', reason: `Neither °C nor °F fits these values (median ${fmt(m)}). Check the file: it may use another format such as tenths of a degree.`, median: m };
   }
 
   const looksF = m > F_MEDIAN_MIN;
@@ -53,12 +64,17 @@ export function suggestUnit(values: number[], headerHint?: Unit | null): UnitSug
   }
 
   if (looksF) {
-    return {
-      unit: 'F',
-      confidence: inFRange ? 'high' : 'low',
-      reason: `Median reading ${fmt(m)} is too warm for a working fridge in Celsius but normal in Fahrenheit (≈ ${fmt(toCelsius(m, 'F'))} °C).`,
-      median: m,
-    };
+    const reason = `Median reading ${fmt(m)} is too warm for a working fridge in Celsius but normal in Fahrenheit (≈ ${fmt(toCelsius(m, 'F'))} °C).`;
+    // D42: whole numbers only (38, 39, 41) could also be tenths of a °C (3.8, 3.9, 4.1): both fit a fridge
+    if (nums.length >= 2 && nums.every((v) => Number.isInteger(v))) {
+      return {
+        unit: 'F',
+        confidence: 'low',
+        reason: `${reason} All readings are whole numbers: if this logger exports tenths of a degree, ${m} would mean ${(m / 10).toFixed(1)} °C. Check the logger before choosing.`,
+        median: m,
+      };
+    }
+    return { unit: 'F', confidence: inFRange ? 'high' : 'low', reason, median: m };
   }
   return { unit: 'C', confidence: 'high', reason: `Median reading ${fmt(m)} fits a fridge in Celsius.`, median: m };
 }

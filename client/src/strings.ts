@@ -148,6 +148,8 @@ export const strings = {
     fahrenheit: '°F (Fahrenheit)',
     unitChosen: (u: 'C' | 'F') => `Will be saved as °${u}.`,
     lowConfidence: 'Not sure: please check against the logger.',
+    unitNoFit: (id: string) => `${id} cannot be saved`,
+    unitNoFitHelp: 'Only °C and °F are supported. Remove this file, fix it (or export it again from the logger) and add it again.',
     loggerIn: (fridges: string[]) => `In ${fridges.join(', ')}`,
 
     assignTitle: (file: string) => `Where does ${file} come from?`,
@@ -200,7 +202,8 @@ export const strings = {
     save: (n: number) => `Save ${plural(n, 'new reading')}`,
     saveNothing: 'Save (nothing new)',
     saving: 'Saving…',
-    blocked: (n: number) => `${plural(n, 'decision')} left before saving`,
+    // covers both "choose" (unit, fridge) and "fix the file" (D42)
+    blocked: (n: number) => `${plural(n, 'thing')} to sort out above before saving`,
 
     doneTitle: 'Saved',
     done: (n: number) => `${plural(n, 'new reading')} saved.`,

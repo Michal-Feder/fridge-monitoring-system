@@ -58,6 +58,18 @@ describe('import preview (stateless, D16)', () => {
     expect(logger('TL-0512').moves).toEqual([]);
   });
 
+  it('D42: a logger whose values fit neither °C nor °F blocks saving, even with a unit chosen', () => {
+    const kelvin: UploadFile = { name: 'TL-0777.csv', text: 'Time,Temp\n2026-09-14 06:00,276.1\n2026-09-14 06:15,276.4\n2026-09-14 06:30,277.0\n' };
+    const decisions = { raw: { 'TL-0777.csv': { branch: 'Haifa', fridge: 'Dairy' } }, units: { 'TL-0777': 'C' as const } };
+    const p = previewImport(db, [kelvin], decisions);
+    expect(p.loggers[0].suggestion).toMatchObject({ unit: null, confidence: 'none' });
+    expect(p.canConfirm).toBe(false);
+    expect(p.blocking.join(' ')).toMatch(/TL-0777: these values fit neither °C nor °F \(median 276\.4\)/);
+    const before = snapshot(db);
+    expect(confirmImport(db, [kelvin], decisions, NOW).ok).toBe(false);
+    expect(snapshot(db)).toEqual(before);
+  });
+
   it('writes nothing, even with every decision supplied', () => {
     const before = snapshot(db);
     const p = previewImport(db, [EMAIL], EMAIL_UNITS);
