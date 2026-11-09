@@ -39,12 +39,12 @@ export function FridgePage({ id, range }: { id: number; range: Partial<Range> })
           {state.message}
         </p>
       )}
-      {state.kind === 'ok' && <FridgeBody data={state.data} reload={() => load(true)} />}
+      {state.kind === 'ok' && <FridgeBody data={state.data} reload={() => load(true)} isDefaultRange={!range.from && !range.to} />}
     </section>
   );
 }
 
-function FridgeBody({ data, reload }: { data: FridgeDetail; reload: () => void }) {
+function FridgeBody({ data, reload, isDefaultRange }: { data: FridgeDetail; reload: () => void; isDefaultRange: boolean }) {
   const s = strings.fridge;
   const f = data.fridge;
   const reasons = [...data.status.reasons].sort((a, b) => Number(a.level === 'info') - Number(b.level === 'info'));
@@ -72,7 +72,7 @@ function FridgeBody({ data, reload }: { data: FridgeDetail; reload: () => void }
         )}
       </header>
 
-      {data.range && <RangePicker id={f.id} range={data.range} />}
+      {data.range && <RangePicker id={f.id} range={data.range} isDefault={isDefaultRange} />}
 
       {data.range && (
         <section>
@@ -96,7 +96,8 @@ function FridgeBody({ data, reload }: { data: FridgeDetail; reload: () => void }
   );
 }
 
-function RangePicker({ id, range }: { id: number; range: Range }) {
+/** isDefault: no dates in the URL, so the page already shows the 7 days up to the latest data (D34) */
+function RangePicker({ id, range, isDefault }: { id: number; range: Range; isDefault: boolean }) {
   const s = strings.fridge;
   const [from, setFrom] = useState(tsDate(range.from));
   const [to, setTo] = useState(tsDate(range.to));
@@ -121,9 +122,12 @@ function RangePicker({ id, range }: { id: number; range: Range }) {
         <button type="submit" className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white">
           {s.show}
         </button>
-        <a href={href.fridge(id)} className="py-2 text-center text-sm text-slate-600 underline">
-          {s.last7}
-        </a>
+        {/* only when another period is shown: on the default 7 days it would do nothing */}
+        {!isDefault && (
+          <a href={href.fridge(id)} className="py-2 text-center text-sm text-slate-600 underline">
+            {s.resetRange}
+          </a>
+        )}
       </form>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
         <span className="text-slate-600">{s.rangeShown(range.from, range.to)}</span>

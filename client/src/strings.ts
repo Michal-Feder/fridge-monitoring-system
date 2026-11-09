@@ -239,7 +239,7 @@ export const strings = {
     from: 'From',
     to: 'To',
     show: 'Show',
-    last7: 'Last 7 days',
+    resetRange: 'Reset to last 7 days',
     rangeShown: (from: string, to: string) => `${fmtTs(from)} to ${fmtTs(to)}`,
     report: 'Inspector report',
     noReadings: 'No readings in this period.',
@@ -350,7 +350,6 @@ export const strings = {
     coverage: (p: number) => `${p}%`,
     intro: (n: number) => `${plural(n, 'fridge')}. The full report for each fridge follows the summary, one per page when printed.`,
     link: 'Branch report',
-    dashboardLink: 'Inspector report for a whole branch (or all branches)',
     button: 'Inspector report',
   },
 

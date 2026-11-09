@@ -211,12 +211,6 @@ function DashboardBody({ data }: { data: Dashboard }) {
           </div>
         </details>
       )}
-      {/* D46: reachable even for a branch with no OK fridge (its row above would not exist) */}
-      <p className="mt-4 text-sm">
-        <a href={href.branchReport('all')} className="text-slate-700 underline underline-offset-2">
-          {strings.branchReport.dashboardLink} ›
-        </a>
-      </p>
     </>
   );
 }
