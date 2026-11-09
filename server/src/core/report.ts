@@ -77,7 +77,9 @@ export function durationText(e: EventView, withContinued = true): string {
     ? `at least ${formatDuration(e.minMinutes)}; exact length unknown because ${e.startsAtDataStart ? 'the data starts while it was already above' : 'of a gap in the data'}`
     : e.minMinutes === e.maxMinutes
       ? formatDuration(e.minMinutes)
-      : `between ${formatDuration(e.minMinutes)} and ${formatDuration(e.maxMinutes as number)}`;
+      : e.minMinutes === 0 // one high reading: provably at least 0 min, so only the upper bound is said (D49)
+        ? `up to ${formatDuration(e.maxMinutes as number)}`
+        : `between ${formatDuration(e.minMinutes)} and ${formatDuration(e.maxMinutes as number)}`;
   // D45: the period ended inside this excursion; the readings after it show when it really ended
   return e.continuesAfter && withContinued ? `${base}; ${continuedText(e)}` : base;
 }
@@ -88,7 +90,7 @@ function continuedText(e: EventView): string {
 
 /** `withLabel: false` for the "Longest: ..." sentence, which would otherwise read "Longest: Excursion: above". */
 export function eventSentence(e: EventView, threshold: number, withLabel = true): string {
-  const label = { spike: 'Short spike (likely a door opening)', unverified: 'Short excursion that cannot be verified', sustained: 'Excursion', ongoing: 'Ongoing excursion' }[e.class];
+  const label = { spike: 'Short spike (likely a door opening)', unverified: 'Time above the limit, length unknown', sustained: 'Time above the limit', ongoing: 'Still above the limit' }[e.class];
   const when = e.readingsAbove === 1 ? `at ${t(e.firstHigh)}` : `from ${t(e.firstHigh)} to ${t(e.lastHigh)}`;
   const continued = e.continuesAfter && !e.ongoing ? `; ${continuedText(e)}` : '';
   return `${withLabel ? `${label}: a` : 'a'}bove ${deg(threshold)} ${when} (${durationText(e, false)}), peak ${deg(e.peak)}${continued}.`;
@@ -112,9 +114,16 @@ export function inspectorReport(r: ReportInput): Report {
     headline = `In the recorded readings (${recordedSpan(r.firstReading!, r.lastReading!)}) ${r.fridgeLabel} did not go above ${deg(r.threshold)}. ${missingSentence}`;
   } else if (r.events.length === 0) {
     headline = `${r.fridgeLabel} did not go above ${deg(r.threshold)} in any recorded reading ${range}.`;
+  } else if (counted.length === 0) {
+    // D49: only short spikes: never "went above ... 0 times"
+    const spikeText = spikesText(spikes.length);
+    headline = partial
+      ? `In the recorded readings (${recordedSpan(r.firstReading!, r.lastReading!)}) ${r.fridgeLabel} did not stay above ${deg(r.threshold)}; ${spikeText}. ${missingSentence}`
+      : `${r.fridgeLabel} did not stay above ${deg(r.threshold)} ${range}; ${spikeText}.`;
+    for (const e of r.events) sentences.push(eventSentence(e, r.threshold));
   } else {
     const parts = [`${counted.length} time${counted.length === 1 ? '' : 's'}`];
-    if (spikes.length) parts.push(`plus ${spikes.length} short spike${spikes.length === 1 ? '' : 's'} of at most 30 minutes`);
+    if (spikes.length) parts.push(`plus ${spikesText(spikes.length)}`);
     headline = `${r.fridgeLabel} went above ${deg(r.threshold)} ${parts.join(', ')} ${range}.${partial ? ` ${missingSentence}` : ''}`;
     const longest = counted.reduce<EventView | null>((a, b) => (!a || b.minMinutes > a.minMinutes ? b : a), null);
     if (longest) sentences.push(`Longest: ${eventSentence(longest, r.threshold, false)}`);
@@ -141,6 +150,8 @@ export function inspectorReport(r: ReportInput): Report {
   notes.push(`"Above" means strictly above ${deg(r.threshold)}. Durations are ranges: the shortest is between the first and last high reading, the longest is between the normal readings around them.`);
   return { headline, sentences, notes, coverage: cov };
 }
+
+const spikesText = (n: number) => `${n} short spike${n === 1 ? '' : 's'} of up to 30 min (door?)`;
 
 /** "14 Sep 2026 06:00 to 06:30" on one day, otherwise both full times. */
 function recordedSpan(first: LocalTs, last: LocalTs): string {

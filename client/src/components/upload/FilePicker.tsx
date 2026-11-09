@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import type { UploadFile } from '../../api.ts';
 import { strings } from '../../strings.ts';
+import { ExcelFormatError, xlsxToTsv } from '../../excel.ts';
 
 interface Props {
   files: UploadFile[];
@@ -9,7 +10,7 @@ interface Props {
   onError: (message: string) => void;
 }
 
-/** Choose files, drop them, or paste rows from Excel. Files are read as text in the browser (D16). */
+/** Choose files (Excel .xlsx, CSV, TSV), drop them, or paste rows from Excel. Everything becomes text in the browser (D16, D50). */
 export function FilePicker({ files, onAdd, onRemove, onError }: Props) {
   const s = strings.upload;
   const input = useRef<HTMLInputElement>(null);
@@ -22,9 +23,11 @@ export function FilePicker({ files, onAdd, onRemove, onError }: Props) {
     const out: UploadFile[] = [];
     for (const f of Array.from(list)) {
       try {
-        out.push({ name: f.name, text: await f.text() });
-      } catch {
-        onError(s.readError(f.name));
+        // D50: an Excel file becomes tab-separated text here; the server only ever sees text
+        const excel = /\.xlsx?$/i.test(f.name) || f.type.includes('spreadsheetml') || f.type === 'application/vnd.ms-excel';
+        out.push({ name: f.name, text: excel ? await xlsxToTsv(f) : await f.text() });
+      } catch (e) {
+        onError(e instanceof ExcelFormatError ? s.oldXls(f.name) : s.readError(f.name));
       }
     }
     if (out.length) onAdd(out);

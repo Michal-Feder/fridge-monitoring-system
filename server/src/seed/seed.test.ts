@@ -83,6 +83,8 @@ describe('seed: every story shows the status it was written for', () => {
     expect(row('Tel Aviv / Display 1')).toMatchObject({ level: 'green', reasons: ['info:spikes'] });
     expect(row('Tel Aviv / Walk-in').level).toBe('grey');
     expect(row('Tel Aviv / Walk-in').reasons).toEqual(expect.arrayContaining(['grey:no_logger', 'grey:stale']));
+    // D48: Display 2 only has readings since TL-0417 arrived on 17 Sep: about half the week, so grey, not green
+    expect(row('Tel Aviv / Display 2')).toMatchObject({ level: 'grey', reasons: ['grey:low_coverage', 'info:spikes'] });
     const name = new Map(repo.fridges(db).map((f) => [f.id, `${f.branch} / ${f.name}`]));
     expect(repo.assignments(db, 'TL-0417').map((a) => [name.get(a.fridgeId), a.validFrom, a.validTo])).toEqual([
       ['Tel Aviv / Walk-in', '2026-09-10T00:00', '2026-09-17T06:00'],

@@ -70,11 +70,11 @@ export const strings = {
     minMinutes: 'For at least (minutes)',
     from: 'From',
     to: 'To',
-    certainty: 'Count an excursion when it',
-    possibly: 'may have lasted that long',
-    possiblyHelp: 'Includes excursions whose length is unknown because of a gap. Safe default for the inspector.',
-    certainly: 'certainly lasted that long',
-    certainlyHelp: 'Only excursions proven to be that long by the readings.',
+    certainty: 'Which times to count',
+    possibly: 'Include times with unknown length (safer)',
+    possiblyHelp: 'Also counts times above the limit whose length is unknown because of a gap.',
+    certainly: 'Only times we know lasted that long',
+    certainlyHelp: 'Only times the readings prove were that long.',
     run: 'Search',
     none: 'Try a lower temperature or fewer minutes.',
     report: 'Report',
@@ -84,8 +84,8 @@ export const strings = {
     query: (above: number, min: number, from: string, to: string, certainty: 'possibly' | 'certainly') =>
       `Fridges above ${fmtTemp(above)} for at least ${fmtDuration(min)}, ${fmtTs(from, true)} to ${fmtTs(to, true)}. ` +
       (certainty === 'possibly'
-        ? 'Counted when an excursion may have lasted that long (including those whose length is unknown because of a gap).'
-        : 'Counted only when the readings prove an excursion lasted that long.'),
+        ? 'Includes times with unknown length (safer).'
+        : 'Only times we know lasted that long.'),
     count: (n: number, checked: number) => `${n} of ${plural(checked, 'fridge')} match.`,
     noneSentence: (above: number, min: number, from: string, to: string, checked: number) =>
       `No fridge was above ${fmtTemp(above)} for at least ${fmtDuration(min)} between ${fmtTs(from, true)} and ${fmtTs(to, true)}; ${plural(checked, 'fridge')} were checked.`,
@@ -125,10 +125,10 @@ export const strings = {
 
   upload: {
     title: 'Upload logger files',
-    intro: 'Add the weekly sheet or raw logger files (CSV or TSV). Nothing is saved until you press Save.',
+    intro: 'Add the weekly sheet or raw logger files: Excel (.xlsx), CSV or TSV, or paste rows from Excel. Nothing is saved until you press Save.',
     pick: 'Choose files',
     drop: 'or drop them here',
-    accept: '.csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values',
+    accept: '.xlsx,.xls,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain,text/tab-separated-values',
     pasteLabel: 'Or paste from Excel',
     pastePlaceholder: 'Copy the rows in Excel (with or without the header row) and paste them here',
     pasteAdd: 'Add pasted rows',
@@ -138,6 +138,7 @@ export const strings = {
     removeFile: (name: string) => `Remove ${name}`,
     clear: 'Start over',
     readError: (name: string) => `Could not read ${name}.`,
+    oldXls: (name: string) => `${name} is an old Excel file (.xls). Save it as .xlsx or CSV and add it again.`,
     checking: 'Checking the files…',
 
     summary: 'What was found',
@@ -270,7 +271,7 @@ export const strings = {
     eventsNoneNoData: 'No readings in this period, so we cannot tell.',
     eventsNonePartial: (max: number, percent: number) =>
       `Never above ${fmtTemp(max)} in the recorded readings. Only ${percent}% of this period has readings; what happened in the rest is unknown.`,
-    eventClass: { spike: 'Short spike', unverified: 'Could not be verified', sustained: 'Too warm', ongoing: 'Still too warm' },
+    eventClass: { spike: 'Short spike', unverified: 'Length unknown', sustained: 'Too warm', ongoing: 'Still too warm' },
     eventWhen: (e: { firstHigh: string; lastHigh: string; readingsAbove: number }) =>
       e.readingsAbove === 1 ? `at ${fmtTs(e.firstHigh)}` : `${fmtTs(e.firstHigh)} to ${fmtTs(e.lastHigh)}`,
     eventDuration: (e: { minMinutes: number; maxMinutes: number | null; ongoing: boolean; durationKnown: boolean; startsAtDataStart: boolean; continuesAfter?: boolean; lastHigh?: string }) => {
@@ -335,7 +336,7 @@ export const strings = {
     coverage: (percent: number, missing: number) =>
       percent >= 100 ? 'Readings cover the whole period.' : `Readings cover ${percent}% of the period; ${fmtDuration(missing)} has no readings.`,
     cols2: { from: 'From', to: 'To', length: 'Length' },
-    notes: 'Reliability notes',
+    notes: 'About this data',
     wholeBranch: (branch: string) => `Whole branch: ${branch}`,
   },
 
@@ -374,6 +375,8 @@ export const strings = {
         return 'No logger is assigned to this fridge.';
       case 'no_data':
         return 'No readings in this period.';
+      case 'low_coverage':
+        return `Readings cover only ${n(p.percent)}% of this period; the rest is unknown.`;
       case 'stale':
         return `No readings since ${t(p.last)} (${fmtDuration(n(p.minutes))} before the latest data).`;
       case 'gap':
@@ -381,7 +384,7 @@ export const strings = {
       case 'errors':
         return `${plural(n(p.count), 'error reading')} (e.g. "ERR") in this period.`;
       case 'spikes':
-        return `${plural(n(p.count), 'short spike')} of at most 30 min (door opening?).`;
+        return `${plural(n(p.count), 'short spike')} of up to 30 min (door?).`;
       case 'conflicts':
         return `${plural(n(p.count), 'reading')} with two different values at the same time; the higher one is used.`;
       default:

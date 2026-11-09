@@ -21,7 +21,7 @@ beforeAll(() => {
 describe('dashboard', () => {
   it('uses the latest reading as "now" and lists red, was red, orange, grey before green (D11, D22, D36)', () => {
     const d = dashboard(db, '7d');
-    expect(d).toMatchObject({ asOf: '2026-09-20T23:45', windowStart: '2026-09-13T23:45', counts: { red: 1, was_red: 1, orange: 2, grey: 4, green: 20 } });
+    expect(d).toMatchObject({ asOf: '2026-09-20T23:45', windowStart: '2026-09-13T23:45', counts: { red: 1, was_red: 1, orange: 2, grey: 5, green: 19 } });
     const ranks = d.fridges.map((f) => levelRank(f.level));
     expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
     // too warm now first, then the fridge that was too warm earlier in the week
@@ -122,7 +122,9 @@ describe('inspector report', () => {
 
   it('labels the door spike instead of hiding it, and notes the gap, the error and the °F conversion', () => {
     const tlv = fridgeReport(db, idOf('Tel Aviv / Walk-in'), { from: '2026-09-14T00:00', to: '2026-09-14T23:59' });
-    expect(tlv.report.headline).toContain('plus 1 short spike of at most 30 minutes');
+    // D49: spikes only -> "did not stay above", never "went above ... 0 times"
+    expect(tlv.report.headline).toBe('Tel Aviv / Walk-in did not stay above 5.0 °C between 14 Sep 2026 00:00 and 14 Sep 2026 23:59; 1 short spike of up to 30 min (door?).');
+    expect(tlv.report.sentences).toEqual(['Short spike (likely a door opening): above 5.0 °C at 14 Sep 2026 06:15 (up to 30 min), peak 9.4 °C.']);
     const jer = fridgeReport(db, idOf('Jerusalem / Dairy'), { from: '2026-09-14T00:00', to: '2026-09-14T23:59' });
     expect(jer.report.notes.join(' ')).toMatch(/1 period with no data \(2 h 15 min in total\).*nothing was filled in/);
     const haifa = fridgeReport(db, idOf('Haifa / Dairy'), { from: '2026-09-14T00:00', to: '2026-09-14T23:59' });

@@ -193,6 +193,21 @@ describe('status (D11, D22, D23)', () => {
     expect(a.reasons.map((r) => r.code)).toContain('no_data');
   });
 
+  it('D48: grey "low_coverage" when readings cover less than 80% of the window; full coverage stays green', () => {
+    const week = { threshold: 5, asOf: '2026-09-20T23:30', windowStart: '2026-09-13T23:30', hasLogger: true };
+    // readings only on the last 2 days of a 7-day window: about 29% covered
+    const a = analyzeFridge({ ...week, readings: steady('2026-09-19T00:00', '2026-09-20T23:30') });
+    expect(a.level).toBe('grey');
+    const r = a.reasons.find((x) => x.code === 'low_coverage')!;
+    expect(r).toMatchObject({ level: 'grey' });
+    expect(r.params.percent).toBeGreaterThan(25);
+    expect(r.params.percent).toBeLessThan(35);
+    // the whole week has readings: green, no low_coverage
+    const full = analyzeFridge({ ...week, readings: steady('2026-09-13T00:00', '2026-09-20T23:30') });
+    expect(full.level).toBe('green');
+    expect(full.reasons.map((x) => x.code)).not.toContain('low_coverage');
+  });
+
   it('grey when the data stopped (stale) and when the fridge has no logger', () => {
     const a = analyzeFridge({ readings: steady('2026-09-19T00:00', '2026-09-20T10:00'), threshold: 5, asOf: '2026-09-20T23:30', windowStart: '2026-09-20T00:00', hasLogger: false });
     expect(a.level).toBe('grey');

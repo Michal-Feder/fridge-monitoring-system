@@ -1,48 +1,57 @@
-# NOTES
+# Notes
 
 ## Time spent
-TODO: X h total: planning ~A h, build ~B h, manual review ~C h.
+About 12 hours: planning ~3 h, building with AI ~5 h, checking the app and fixing ~4 h.
 
 ## How I worked
-- Planned with Gemini, GPT and Claude, reviewed the plan myself and kept the result in `INIT.md` and `DECISIONS.md`.
-- A cloud Claude session wrote and tested the core rules; Claude Code built the rest locally from
-  `docs/HANDOFF.md` (the step-by-step brief, kept unchanged).
-- The AI never ran git: it stopped at each COMMIT POINT, and I reviewed the diff and committed.
-- I checked every screen myself, which found D36, D38 and D40; a code review found D44 and D45.
+- I planned with three AI tools (Gemini, GPT, Claude) and wrote the plan in INIT.md.
+  Every rule and the reason for it is in DECISIONS.md.
+- Claude wrote the core rules with their tests. Claude Code built the rest on my laptop,
+  step by step, from docs/HANDOFF.md.
+- The AI never committed. After each step I read the changes, ran the app and committed myself.
+- I tested every screen in a phone-sized window. That is how I found three of the problems below.
 
-## Decisions Summer did not ask for
-All of them, with the reasons, are in `DECISIONS.md` (D1-D47). The ones she will notice: the unit is suggested and
-confirmed once per logger, never converted silently (D3, D42); durations are ranges, "at least" when data is missing
-(D6, D7); grey "no reliable data" never looks green (D11); a short door spike is labelled, not red (D8); a finished
-excursion is "Was too warm – check the products", not "Too warm" (D36); "now" is the latest reading uploaded (D22);
-the report says how much of the period has readings (D40); one printable report per branch (D46).
+## Decisions Summer didn't ask for
+- Haifa's logger is in °F. The app suggests the unit and a person confirms it once per logger.
+  It never converts on its own.
+- "How long above 5 °C" is a range (e.g. "1 h 45 min to 2 h 15 min"), because a logger only
+  measures every 15-60 minutes.
+- One high reading that is back to normal within 30 minutes (a door opening) is labelled,
+  not shown as a problem.
+- Missing data is grey, never green, also when only part of the week has readings. A gap is
+  "unknown"; nothing is filled in.
+- A fridge that warms slowly gets an orange warning before it reaches 5 °C, compared with
+  its own normal temperature.
+- A fridge that was too warm earlier this week but is fine now says
+  "Was too warm – check the products".
+- A fridge is identified by branch and name, not by logger, because loggers move.
+- Upload takes Excel (.xlsx), CSV/TSV files, or rows pasted from Excel. It has two steps: a preview of what was
+  found, then Save. The same file twice changes nothing.
+- One printable report per branch for the inspector.
 
 ## Questions for Summer
-Collected in `DECISIONS.md` (rows marked "Question for Summer" and "Open / to decide"). The main ones: other limits
-or freezers; defrost cycles and the warm-up warning; do file names contain the logger number; loggers that export
-tenths or another unit; a new logger for Tel Aviv / Walk-in; one logger per fridge; should someone acknowledge an
-excursion to clear it; who should be alerted.
+1. How often can the files be uploaded? Once a week means the warm-up warning comes late.
+2. Is "above 5" strictly above 5.0? Any freezers or products with other limits?
+3. Do the fridges defrost on a schedule? It can look like warming up.
+4. Does Tel Aviv / Walk-in have a new logger since TL-0417 moved?
+5. Who should be told when something is wrong, and how fast?
 
 ## Not done / next hour
-- Next hour: "what changed since the last upload" on the dashboard; CSV export of the report table.
-- Not done: alerts (would need an account or service), over-cooling check (D30), acknowledging excursions, deleting
-  data, more than one logger per fridge. Client code has no automated tests (the rules are in `server/src/core`).
-- **Security:** `npm start` serves the app on the local network with no password (that is how Summer opens it on her
-  phone). Use it only on a trusted Wi-Fi; anyone on the same network can see and change the data.
+- Next hour: show on the dashboard what changed since the last upload.
+- Not done: email/SMS alerts, a "too cold" check,
+  marking a problem as handled, deleting data, automated tests for the screens.
+- Known limits: pasting a corrected file again does not move readings already saved. When one time has two
+  values, the higher one is used.
 
-## AI tools: what went wrong
-**The main case, fully located.** While planning, Gemini said the Haifa readings (38.3, 39.0) were "10x too high" and
-should be divided by 10. 38.3 / 10 = 3.83 looks like a healthy fridge, so nothing would look wrong. They are
-Fahrenheit: 38.3 °F = 3.5 °C. The test that guards it was committed alone and failing first: commit `7b8ecae`
-("Failing test: Haifa TL-0231 is Fahrenheit, not x10"), file `server/src/core/units.test.ts`, first row of
-`AI_LOG.md`; the fix is the next commit.
+## AI: one thing it got wrong
+While planning, Gemini said the Haifa numbers (38.3, 39.0) were "10 times too high" and should
+be divided by 10. That gives 3.83, which looks like a normal fridge, so the mistake is easy to
+miss. I converted by hand: 38.3 °F is 3.5 °C. It is Fahrenheit.
+- Test: `server/src/core/units.test.ts` fails if anyone divides by 10.
+- Commits: `7b8ecae` (the failing test) and `7831e3d` (the fix). The test was written before
+  the code in my first AI session; these two commits replay that order.
+- Log: first row of `AI_LOG.md`.
 
-Other cases (details in `AI_LOG.md`):
-- Stack reversal: an AI dropped the agreed stack for "zero dependencies" because its sandbox could not download
-  packages, and presented that as a project decision; I caught it and the stack was restored (D15, D17).
-- Caught by tests: the median interval hid the 2 h 15 min Jerusalem gap (D5); a 1.5 °C warm-up threshold warned too
-  late (D10).
-- Found by me reviewing the app: red for a fridge back to normal (D36), a logger move shown as a gap (D38), the report
-  calling a week "fine" with 30 minutes of readings (D40).
-- Found in code review: a raw file spanning a logger move put every row in one fridge (D44); a period ending inside
-  an excursion said "still above" (D45).
+Other AI mistakes I caught are in AI_LOG.md: the AI changed the agreed stack because its own
+sandbox could not install packages; tests showed two rules were wrong; I found three problems
+by using the app (D36, D38, D40); a separate AI code review found more: D44, D45, D48, D49.

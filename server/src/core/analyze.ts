@@ -5,6 +5,7 @@ import { typicalInterval, findGapsMulti, gapLimit, type Gap } from './gaps.ts';
 import { findExcursions, type Excursion, type SeriesPoint } from './events.ts';
 import { evaluateTrend, firstWarning, type TrendResult, type TempPoint } from './trend.ts';
 import { fridgeStatus, type Level, type Reason } from './status.ts';
+import { coverage } from './report.ts';
 
 export interface Reading {
   loggerId: string;
@@ -88,6 +89,14 @@ export function toSeries(readings: Reading[]): SeriesPoint[] {
   return [...byT.values()].sort((a, b) => a.t - b.t).map(({ t, temp, conflict }) => ({ t, temp, conflict }));
 }
 
+/** D48: share of the status window with readings, by the same rule as the report (D40). */
+function windowCoverage(from: LocalTs, to: LocalTs, winReadings: Reading[], gaps: Gap[], gapLimitMin: number | null): number | null {
+  if (winReadings.length === 0) return null; // "no_data" covers it
+  const ts = winReadings.map((r) => r.ts).sort();
+  const gapViews = gaps.map((g) => ({ from: fromMinutes(g.fromMin), to: fromMinutes(g.toMin), minutes: g.minutes }));
+  return coverage({ from, to, dataEnd: to, gapLimitMin, firstReading: ts[0], lastReading: ts[ts.length - 1], gaps: gapViews, readings: winReadings.length }).percent;
+}
+
 export interface AnalyzeInput {
   readings: Reading[];
   threshold: number;
@@ -145,6 +154,7 @@ export function analyzeFridge(input: AnalyzeInput): FridgeAnalysis {
     gapsInWindow: gaps.filter((g) => g.toMin >= windowMin),
     errorsInWindow: winReadings.filter((r) => r.status === 'error').length,
     conflictsInWindow: winReadings.filter((r) => r.status === 'conflict').length,
+    coveragePercent: windowCoverage(input.windowStart, input.asOf, winReadings, gaps, currentLogger ? gapLimit(typical.get(currentLogger) ?? null) : null),
   });
 
   let warn: LocalTs | null = null;

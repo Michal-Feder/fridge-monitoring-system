@@ -8,7 +8,7 @@ import type { TrendResult } from './trend.ts';
 export type Level = 'red' | 'was_red' | 'orange' | 'grey' | 'green';
 export type ReasonCode =
   | 'ongoing' | 'sustained' | 'warming' | 'unverified'
-  | 'no_logger' | 'no_data' | 'stale' | 'gap' | 'errors'
+  | 'no_logger' | 'no_data' | 'low_coverage' | 'stale' | 'gap' | 'errors'
   | 'spikes' | 'conflicts';
 
 export interface Reason {
@@ -19,6 +19,8 @@ export interface Reason {
 
 export const REPEATED_ERRORS = 3;
 export const MIN_STALE_MIN = 60;
+/** D48: below this share of the window with readings, the status cannot be trusted: grey */
+export const LOW_COVERAGE_PERCENT = 80;
 
 export interface StatusInput {
   hasLogger: boolean;
@@ -32,6 +34,8 @@ export interface StatusInput {
   gapsInWindow: Gap[];
   errorsInWindow: number;
   conflictsInWindow: number;
+  /** D48: % of the window that has readings (core/report.ts coverage(), same rule as D40) */
+  coveragePercent: number | null;
 }
 
 const ORDER: Level[] = ['red', 'was_red', 'orange', 'grey', 'green'];
@@ -62,6 +66,12 @@ export function fridgeStatus(i: StatusInput): { level: Level; reasons: Reason[] 
   if (i.gapsInWindow.length) {
     const longest = i.gapsInWindow.reduce((a, b) => (b.minutes > a.minutes ? b : a));
     add('grey', 'gap', { count: i.gapsInWindow.length, longest: longest.minutes, from: longest.fromMin, to: longest.toMin });
+  }
+  // D48: too little of the window has readings (typically: data only starts late in the window). Not added
+  // when "stale" or "gap" is already listed: they name the same missing time more precisely.
+  const explained = reasons.some((r) => r.code === 'stale' || r.code === 'gap');
+  if (i.readingsInWindow > 0 && !explained && i.coveragePercent !== null && i.coveragePercent < LOW_COVERAGE_PERCENT) {
+    add('grey', 'low_coverage', { percent: i.coveragePercent });
   }
   if (i.errorsInWindow >= REPEATED_ERRORS) add('grey', 'errors', { count: i.errorsInWindow });
 

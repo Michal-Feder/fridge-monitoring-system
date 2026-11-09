@@ -16,7 +16,7 @@
 
 ## E docs
 - [x] README from clean clone (clone, `npm install`, `npm run seed`, `seed -- --empty`, `npm test`, `npm run build`, `npm run dev` checked on Windows / Node 24.12)
-- [x] NOTES.md (left: "Time spent", to be filled in by hand) - [x] DECISIONS (D1-D47) / AI_LOG up to date
+- [x] NOTES.md (left: "Time spent", to be filled in by hand) - [x] DECISIONS (D1-D50) / AI_LOG up to date
 
 ## Review fixes and extras
 - [x] raw file across a logger move (D44) - [x] period ending inside an excursion (D45) - [x] branch report (D46)
