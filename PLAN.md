@@ -4,11 +4,11 @@
 - [x] workspaces + TS + Vitest + Tailwind v4 - [x] `concurrently` dev script - [x] Express `/api/health` - [x] `.gitignore`
 
 ## B core + tests
-- [ ] units (Fahrenheit test committed alone, failing) - [ ] time + parseTime - [ ] parseTemp - [ ] csv - [ ] names - [ ] columns
-- [ ] dedupe - [ ] gaps - [ ] events - [ ] trend - [ ] status - [ ] assignments - [ ] report - [ ] analyze - [ ] email sample end to end
+- [x] units (Fahrenheit test committed alone, failing) - [x] time + parseTime - [x] parseTemp - [x] csv - [x] names - [x] columns
+- [x] dedupe - [x] gaps - [x] events - [x] trend - [x] status - [x] assignments - [x] report - [x] analyze - [x] email sample end to end
 
 ## C DB + import + seed + API
-- [ ] schema.sql - [ ] import preview / confirm (idempotent) - [ ] seed + sample-data - [ ] dashboard - [ ] fridge - [ ] report
+- [x] schema.sql - [x] import preview / confirm (idempotent) - [x] seed + sample-data - [ ] dashboard - [ ] fridge - [ ] report
 - [ ] search - [ ] PATCH fridge - [ ] CRUD-lite
 
 ## D client

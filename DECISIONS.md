@@ -36,6 +36,7 @@ something else; the old version and the reason for the change are kept.
 | D29 | Threshold search: "possibly" (max duration >= N, default) or "certainly" (min duration >= N). | For the inspector "possibly" is the safe default; "certainly" is useful for Summer's own triage. |
 | D30 | Over-cooling (`min_temp`) is stored but not evaluated yet. | Not asked for; freezing dairy is a real but secondary risk. Question for Summer. |
 | D31 | Demo week is 2026-09-14 .. 2026-09-20 (the week in the email). | |
+| D32 | Seed data runs 2026-09-10 .. 2026-09-20: the demo week plus 4 days before it. Files are imported in two batches through `confirmImport`: the sheets first (they create branches, fridges and logger history), then the raw logger files, so `TL0490.csv` gets its fridge from the history (D25) instead of a decision. Every demo story is a Vitest assertion (`seed/seed.test.ts`), not just a printed table. | The trend rule needs >= 3 days of history before it can warn (D10); without the extra days nothing could turn orange in the demo week. Asserting the stories means a later rule change that breaks the demo fails `npm test`. |
 
 ## Open / to decide with Summer
 - Defrost cycles: may trigger the trend rule.
