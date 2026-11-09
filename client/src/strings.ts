@@ -55,6 +55,58 @@ export const strings = {
     label: 'Main',
     dashboard: 'Dashboard',
     upload: 'Upload',
+    search: 'Search',
+    setup: 'Setup',
+  },
+
+  search: {
+    title: 'Find times above a temperature',
+    intro: 'Which fridges were above a temperature for at least some minutes, and when.',
+    above: 'Above (°C)',
+    minMinutes: 'For at least (minutes)',
+    from: 'From',
+    to: 'To',
+    certainty: 'Count an excursion when it',
+    possibly: 'may have lasted that long',
+    possiblyHelp: 'Includes excursions whose length is unknown because of a gap. Safe default for the inspector.',
+    certainly: 'certainly lasted that long',
+    certainlyHelp: 'Only excursions proven to be that long by the readings.',
+    run: 'Search',
+    summary: (n: number, above: number, min: number, from: string, to: string) =>
+      `${plural(n, 'fridge')} above ${fmtTemp(above)} for at least ${fmtDuration(min)} between ${fmtTs(from)} and ${fmtTs(to)}.`,
+    none: 'No fridge matches. Try a lower temperature or fewer minutes.',
+    report: 'Report',
+  },
+
+  setup: {
+    title: 'Setup',
+    intro: 'Branches, fridges and loggers. New branches and fridges are also created by uploads.',
+    branches: 'Branches and fridges',
+    noLogger: 'no logger',
+    fridgeCount: (n: number) => plural(n, 'fridge'),
+    limit: (max: number) => `limit ${fmtTemp(max)}`,
+    addBranch: 'Add a branch',
+    branchName: 'Branch name',
+    branchAdded: (name: string, created: boolean) => (created ? `Added ${name}.` : `${name} already exists (names ignore upper/lower case).`),
+    addFridge: 'Add a fridge',
+    branch: 'Branch',
+    fridgeName: 'Fridge name',
+    fridgeLimit: 'Limit (°C)',
+    fridgeAdded: (branch: string, name: string) => `Added ${branch} / ${name}.`,
+    add: 'Add',
+    loggers: 'Loggers',
+    loggersNone: 'No loggers yet. They appear after the first upload.',
+    loggerWhere: (label: string | null, since: string) => (label ? `${label} since ${fmtTs(since)}` : 'not in a fridge'),
+    loggerStats: (n: number, last: string | null) => `${plural(n, 'reading')}${last ? `, last ${fmtTs(last)}` : ''}`,
+    move: 'Move',
+    moveTitle: (id: string) => `Move ${id}`,
+    moveTo: 'To fridge',
+    moveFrom: 'From (date and time)',
+    moveHelp: 'Only changes where the logger is from that time on. Readings already saved keep the fridge they were uploaded with.',
+    moveSave: 'Move logger',
+    moved: (id: string, label: string) => `${id} is now in ${label}.`,
+    cancel: 'Cancel',
+    choose: 'Choose…',
   },
 
   upload: {
@@ -202,6 +254,8 @@ export const strings = {
       if (e.ongoing) return `at least ${fmtDuration(e.minMinutes)}, still above at the last reading`;
       if (!e.durationKnown) return `at least ${fmtDuration(e.minMinutes)}; exact length unknown (${e.startsAtDataStart ? 'the data starts while it was already above' : 'gap in the data'})`;
       if (e.minMinutes === e.maxMinutes) return fmtDuration(e.minMinutes);
+      // one high reading: provably at least 0 min, so say only the upper bound
+      if (e.minMinutes === 0) return `up to ${fmtDuration(e.maxMinutes ?? 0)}`;
       return `${fmtDuration(e.minMinutes)} to ${fmtDuration(e.maxMinutes ?? 0)}`;
     },
     eventPeak: (peak: number) => `peak ${fmtTemp(peak)}`,

@@ -204,6 +204,21 @@ export interface FridgeReport {
   gaps: GapView[];
 }
 
+// --- threshold search (analysisService.search, D29)
+export type Certainty = 'possibly' | 'certainly';
+/** form values as typed: the server parses numbers ("4,5" too) and dates */
+export interface SearchQuery {
+  above: string;
+  minMinutes: string;
+  from?: string;
+  to?: string;
+  certainty: Certainty;
+}
+export interface SearchResult {
+  query: { above: number; minMinutes: number; certainty: Certainty; from: string; to: string };
+  results: { fridge: FridgeInfo; events: EventView[] }[];
+}
+
 // --- setup (server/src/services/setupService.ts)
 export interface LoggerInfo {
   id: string;
@@ -260,5 +275,14 @@ export const api = {
   report: (id: number, range?: Partial<Range>) => request<FridgeReport>(`/api/fridges/${id}/report${rangeQuery(range)}`),
   setMaxTemp: (id: number, maxTemp: string) => request<FridgeInfo>(`/api/fridges/${id}`, json('PATCH', { maxTemp })),
   loggers: () => request<LoggerInfo[]>('/api/loggers'),
+  search: (q: SearchQuery) => {
+    const p = new URLSearchParams({ above: q.above, minMinutes: q.minMinutes, certainty: q.certainty });
+    if (q.from) p.set('from', q.from);
+    if (q.to) p.set('to', q.to);
+    return request<SearchResult>(`/api/search?${p}`);
+  },
+  createBranch: (name: string) => request<{ id: number; name: string; created: boolean }>('/api/branches', postJson({ name })),
+  createFridge: (f: { branchId: number; name: string; maxTemp: string }) => request<FridgeInfo>('/api/fridges', postJson(f)),
+  moveLogger: (id: string, m: { fridgeId: number; from: string }) => request<unknown>(`/api/loggers/${encodeURIComponent(id)}/move`, postJson(m)),
   setLoggerUnit: (id: string, unit: Unit) => request<{ loggerId: string; unit: Unit; recomputed: number }>(`/api/loggers/${encodeURIComponent(id)}`, json('PATCH', { unit })),
 };
