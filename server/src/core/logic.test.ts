@@ -194,6 +194,22 @@ describe('status (D11, D22, D23)', () => {
     expect(a.level).toBe('red');
     expect(a.reasons.map((x) => x.code)).toContain('gap');
   });
+
+  it('a finished sustained excursion says when it was back to normal (a past event must not read as "too warm now")', () => {
+    const r = steady('2026-09-20T00:00', '2026-09-20T23:30');
+    for (const ts of ['2026-09-20T10:00', '2026-09-20T10:30', '2026-09-20T11:00']) r[r.findIndex((x) => x.ts === ts)] = base(ts, 7.0);
+    const a = analyzeFridge({ readings: r, threshold: 5, asOf: '2026-09-20T23:30', windowStart: '2026-09-20T00:00', hasLogger: true });
+    const reason = a.reasons.find((x) => x.code === 'sustained')!;
+    expect(reason.params).toMatchObject({ at: m('2026-09-20T10:00'), nextOk: m('2026-09-20T11:30') });
+  });
+
+  it('an unverified excursion reason carries its peak value', () => {
+    const r = steady('2026-09-20T00:00', '2026-09-20T23:30');
+    r[r.findIndex((x) => x.ts === '2026-09-20T15:00')] = base('2026-09-20T15:00', 6.8);
+    const a = analyzeFridge({ readings: r, threshold: 5, asOf: '2026-09-20T23:30', windowStart: '2026-09-20T00:00', hasLogger: true });
+    expect(a.level).toBe('orange');
+    expect(a.reasons.find((x) => x.code === 'unverified')!.params).toMatchObject({ at: m('2026-09-20T15:00'), peak: 6.8 });
+  });
 });
 
 describe('assignments (D1, D25) - TL-0417 moved Walk-in -> Display 2', () => {

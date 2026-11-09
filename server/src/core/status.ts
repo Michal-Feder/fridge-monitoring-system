@@ -47,10 +47,10 @@ export function fridgeStatus(i: StatusInput): { level: Level; reasons: Reason[] 
   if (ongoing.length) add('red', 'ongoing', { since: ongoing[0].firstHighMin, peak: ongoing[0].peak });
   if (sustained.length) {
     const longest = sustained.reduce((a, b) => (b.minMinutes > a.minMinutes ? b : a));
-    add('red', 'sustained', { count: sustained.length, minMinutes: longest.minMinutes, maxMinutes: longest.maxMinutes, at: longest.firstHighMin, peak: longest.peak });
+    add('red', 'sustained', { count: sustained.length, minMinutes: longest.minMinutes, maxMinutes: longest.maxMinutes, at: longest.firstHighMin, peak: longest.peak, nextOk: longest.nextOkMin });
   }
   if (i.trend.state === 'warming') add('orange', 'warming', { delta: i.trend.delta, baseline: i.trend.baseline, recentMean: i.trend.recentMean });
-  if (unverified.length) add('orange', 'unverified', { count: unverified.length, at: unverified[0].firstHighMin });
+  if (unverified.length) add('orange', 'unverified', { count: unverified.length, at: unverified[0].firstHighMin, peak: unverified[0].peak });
 
   if (!i.hasLogger) add('grey', 'no_logger');
   if (i.readingsInWindow === 0) add('grey', 'no_data');

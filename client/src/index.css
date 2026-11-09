@@ -1,1 +1,15 @@
 @import "tailwindcss";
+
+/* Grey ("no reliable data") must never look like green ("OK"): stripes + dashed border, not just a colour. */
+.no-data-stripes {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--color-slate-100) 0 8px,
+    var(--color-white) 8px 16px
+  );
+}
+
+body {
+  background-color: var(--color-slate-50);
+  color: var(--color-slate-900);
+}
