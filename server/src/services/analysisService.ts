@@ -93,7 +93,7 @@ export function dashboard(db: Db, window: Window = '7d'): Dashboard {
     return { ...base, level: a.level, reasons: a.reasons, lastReading: a.lastReading, events: a.eventsInWindow, trend: a.trend };
   });
   fridges.sort((a, b) => levelRank(a.level) - levelRank(b.level) || a.branch.localeCompare(b.branch) || a.name.localeCompare(b.name));
-  const counts: Record<Level, number> = { red: 0, orange: 0, grey: 0, green: 0 };
+  const counts: Record<Level, number> = { red: 0, was_red: 0, orange: 0, grey: 0, green: 0 };
   for (const f of fridges) counts[f.level]++;
   return { asOf, window, windowStart, counts, fridges };
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, ApiError, type Dashboard, type DashboardFridge, type Level, type Window } from '../api.ts';
+import { api, ApiError, LEVELS, type Dashboard, type DashboardFridge, type Level, type Window } from '../api.ts';
 import { strings } from '../strings.ts';
 import { fmtTemp, fmtTs } from '../format.ts';
 import { FridgeCard } from '../components/FridgeCard.tsx';
@@ -91,6 +91,7 @@ function WindowToggle({ value, onChange }: { value: Window; onChange: (w: Window
 
 const COUNT_STYLE: Record<Level, string> = {
   red: 'bg-red-600 text-white',
+  was_red: 'bg-white border-2 border-red-600 text-red-700',
   orange: 'bg-amber-400 text-amber-950',
   grey: 'no-data-stripes border border-dashed border-slate-500 text-slate-800',
   green: 'bg-green-600 text-white',
@@ -108,13 +109,14 @@ function DashboardBody({ data }: { data: Dashboard }) {
 
   return (
     <>
-      <ul aria-label={s.counts} className="mt-4 grid grid-cols-4 gap-2">
-        {(['red', 'orange', 'grey', 'green'] as const).map((l) => (
-          <li key={l} className={`flex flex-col items-center rounded-lg px-1 py-2 ${COUNT_STYLE[l]}`}>
+      {/* phone: 3 + 2 on a 6-column grid (urgent row first), so every label fits on one line; sm and up: one row */}
+      <ul aria-label={s.counts} className="mt-4 grid grid-cols-6 gap-2 sm:grid-cols-5">
+        {LEVELS.map((l, i) => (
+          <li key={l} className={`flex flex-col items-center rounded-lg px-1 py-2 sm:col-span-1 ${i < 3 ? 'col-span-2' : 'col-span-3'} ${COUNT_STYLE[l]}`}>
             <span className="text-2xl font-bold leading-none">{data.counts[l]}</span>
-            <span className="mt-1 flex items-center gap-1 text-center text-[11px] font-medium leading-tight">
+            <span className="mt-1 flex items-center gap-1 whitespace-nowrap text-center text-[11px] font-medium leading-tight">
               <StatusIcon level={l} className="h-3 w-3 shrink-0" />
-              {strings.level[l]}
+              {strings.levelShort[l]}
             </span>
           </li>
         ))}

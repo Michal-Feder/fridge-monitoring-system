@@ -1,6 +1,8 @@
 // Typed calls to the server. The types mirror the server's JSON (server/src/services/*); they are kept
 // here so the client does not compile server code (node:sqlite) just to share types.
-export type Level = 'red' | 'orange' | 'grey' | 'green';
+/** was_red: a sustained excursion that already ended in the period (D36). Order of urgency = order here. */
+export type Level = 'red' | 'was_red' | 'orange' | 'grey' | 'green';
+export const LEVELS = ['red', 'was_red', 'orange', 'grey', 'green'] as const satisfies readonly Level[];
 export type Window = '7d' | '24h';
 
 export interface Reason {

@@ -1,10 +1,11 @@
-// D11: red / orange / grey / green. Every reason is returned, not only the worst, so a red fridge
+// D11: red / was_red / orange / grey / green (was_red: D36). Every reason is returned, not only the worst, so a red fridge
 // that also has a data gap shows both. "No data" is never green.
 import type { Excursion } from './events.ts';
 import type { Gap } from './gaps.ts';
 import type { TrendResult } from './trend.ts';
 
-export type Level = 'red' | 'orange' | 'grey' | 'green';
+/** was_red = a sustained excursion that already ended inside the window: not "too warm now", but never green (D36). */
+export type Level = 'red' | 'was_red' | 'orange' | 'grey' | 'green';
 export type ReasonCode =
   | 'ongoing' | 'sustained' | 'warming' | 'unverified'
   | 'no_logger' | 'no_data' | 'stale' | 'gap' | 'errors'
@@ -33,7 +34,7 @@ export interface StatusInput {
   conflictsInWindow: number;
 }
 
-const ORDER: Level[] = ['red', 'orange', 'grey', 'green'];
+const ORDER: Level[] = ['red', 'was_red', 'orange', 'grey', 'green'];
 
 export function fridgeStatus(i: StatusInput): { level: Level; reasons: Reason[] } {
   const reasons: Reason[] = [];
@@ -47,7 +48,7 @@ export function fridgeStatus(i: StatusInput): { level: Level; reasons: Reason[] 
   if (ongoing.length) add('red', 'ongoing', { since: ongoing[0].firstHighMin, peak: ongoing[0].peak });
   if (sustained.length) {
     const longest = sustained.reduce((a, b) => (b.minMinutes > a.minMinutes ? b : a));
-    add('red', 'sustained', { count: sustained.length, minMinutes: longest.minMinutes, maxMinutes: longest.maxMinutes, at: longest.firstHighMin, peak: longest.peak, nextOk: longest.nextOkMin });
+    add('was_red', 'sustained', { count: sustained.length, minMinutes: longest.minMinutes, maxMinutes: longest.maxMinutes, at: longest.firstHighMin, peak: longest.peak, nextOk: longest.nextOkMin });
   }
   if (i.trend.state === 'warming') add('orange', 'warming', { delta: i.trend.delta, baseline: i.trend.baseline, recentMean: i.trend.recentMean });
   if (unverified.length) add('orange', 'unverified', { count: unverified.length, at: unverified[0].firstHighMin, peak: unverified[0].peak });

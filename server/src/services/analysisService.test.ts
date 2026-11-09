@@ -19,12 +19,13 @@ beforeAll(() => {
 }, 60_000);
 
 describe('dashboard', () => {
-  it('uses the latest reading as "now" and lists red, orange, grey before green (D11, D22)', () => {
+  it('uses the latest reading as "now" and lists red, was red, orange, grey before green (D11, D22, D36)', () => {
     const d = dashboard(db, '7d');
-    expect(d).toMatchObject({ asOf: '2026-09-20T23:45', windowStart: '2026-09-13T23:45', counts: { red: 2, orange: 2, grey: 4, green: 20 } });
+    expect(d).toMatchObject({ asOf: '2026-09-20T23:45', windowStart: '2026-09-13T23:45', counts: { red: 1, was_red: 1, orange: 2, grey: 4, green: 20 } });
     const ranks = d.fridges.map((f) => levelRank(f.level));
     expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
-    expect(d.fridges.slice(0, 2).map((f) => `${f.branch} / ${f.name}`)).toEqual(['Rishon LeZion / Cream cakes', 'Rishon LeZion / Dairy']);
+    // too warm now first, then the fridge that was too warm earlier in the week
+    expect(d.fridges.slice(0, 2).map((f) => `${f.branch} / ${f.name}: ${f.level}`)).toEqual(['Rishon LeZion / Dairy: red', 'Rishon LeZion / Cream cakes: was_red']);
   });
 
   it('the 24 h window drops what happened earlier in the week, but keeps "no logger" and ongoing problems', () => {
@@ -62,7 +63,7 @@ describe('fridge page', () => {
     expect(d.readings.every((r) => r.ts.startsWith('2026-09-14'))).toBe(true);
     expect(d.events).toHaveLength(1);
     expect(d.events[0]).toMatchObject({ class: 'sustained', firstHigh: '2026-09-14T06:15', lastHigh: '2026-09-14T08:00', peak: 7.4 });
-    expect(d.status.level).toBe('red');
+    expect(d.status.level).toBe('was_red');
   });
 
   it('keeps original values next to °C for the Fahrenheit logger (D4)', () => {

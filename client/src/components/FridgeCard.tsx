@@ -4,6 +4,8 @@ import { StatusBadge } from './Status.tsx';
 
 const CARD: Record<Level, string> = {
   red: 'border-l-8 border-red-600 bg-white',
+  // outline only: it was too warm earlier in the period and is back to normal now (D36)
+  was_red: 'border-2 border-red-600 bg-white',
   orange: 'border-l-8 border-amber-400 bg-white',
   // dashed + striped: "no data" must never look like "fine" (CLAUDE.md, D11)
   grey: 'border-2 border-dashed border-slate-400 no-data-stripes',

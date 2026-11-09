@@ -7,6 +7,7 @@ import { analyzeFridge, type Reading } from './analyze.ts';
 import { changePointsFromRows, rebuildAssignments, fridgeAt, hasOverlap, sameAssignments } from './assignments.ts';
 import { inspectorReport } from './report.ts';
 import { toMinutes, fromMinutes } from './time.ts';
+import { levelRank, type Level } from './status.ts';
 
 const m = (ts: string) => toMinutes(ts);
 const pts = (list: [string, number | null][]): SeriesPoint[] => list.map(([ts, temp]) => ({ t: m(ts), temp }));
@@ -201,6 +202,34 @@ describe('status (D11, D22, D23)', () => {
     const a = analyzeFridge({ readings: r, threshold: 5, asOf: '2026-09-20T23:30', windowStart: '2026-09-20T00:00', hasLogger: true });
     const reason = a.reasons.find((x) => x.code === 'sustained')!;
     expect(reason.params).toMatchObject({ at: m('2026-09-20T10:00'), nextOk: m('2026-09-20T11:30') });
+  });
+
+  it('D36: a sustained excursion that already ended is "was_red", not red and not green', () => {
+    const r = steady('2026-09-20T00:00', '2026-09-20T23:30');
+    for (const ts of ['2026-09-20T10:00', '2026-09-20T10:30', '2026-09-20T11:00']) r[r.findIndex((x) => x.ts === ts)] = base(ts, 7.0);
+    const a = analyzeFridge({ readings: r, threshold: 5, asOf: '2026-09-20T23:30', windowStart: '2026-09-20T00:00', hasLogger: true });
+    expect(a.level).toBe('was_red');
+    expect(a.reasons.map((x) => `${x.level}:${x.code}`)).toEqual(['was_red:sustained']);
+  });
+
+  it('D36: "was_red" ranks after red and before orange and grey', () => {
+    // a finished excursion in the morning, then a gap: was_red wins over grey, both listed
+    const r = steady('2026-09-20T00:00', '2026-09-20T12:00').filter((x) => x.ts < '2026-09-20T15:00');
+    for (const ts of ['2026-09-20T08:00', '2026-09-20T08:30', '2026-09-20T09:00']) r[r.findIndex((x) => x.ts === ts)] = base(ts, 7.0);
+    r.push(...steady('2026-09-20T18:00', '2026-09-20T23:30'));
+    const a = analyzeFridge({ readings: r, threshold: 5, asOf: '2026-09-20T23:30', windowStart: '2026-09-20T00:00', hasLogger: true });
+    expect(a.level).toBe('was_red');
+    expect(a.reasons.map((x) => x.code)).toEqual(['sustained', 'gap']);
+    expect(['red', 'was_red', 'orange', 'grey', 'green'].map((l) => levelRank(l as Level))).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it('D36: still above at the last reading stays red, even with a finished excursion earlier', () => {
+    const r = steady('2026-09-20T00:00', '2026-09-20T22:30');
+    for (const ts of ['2026-09-20T08:00', '2026-09-20T08:30', '2026-09-20T09:00']) r[r.findIndex((x) => x.ts === ts)] = base(ts, 7.0);
+    r.push(base('2026-09-20T23:00', 6.5), base('2026-09-20T23:30', 6.9));
+    const a = analyzeFridge({ readings: r, threshold: 5, asOf: '2026-09-20T23:30', windowStart: '2026-09-20T00:00', hasLogger: true });
+    expect(a.level).toBe('red');
+    expect(a.reasons.map((x) => `${x.level}:${x.code}`)).toEqual(['red:ongoing', 'was_red:sustained']);
   });
 
   it('an unverified excursion reason carries its peak value', () => {

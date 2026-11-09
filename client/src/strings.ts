@@ -20,6 +20,16 @@ export const strings = {
   level: {
     // words, not only colours: the status must read the same on a phone in the sun or in print
     red: 'Too warm',
+    was_red: 'Was too warm – check the products',
+    orange: 'Watch',
+    grey: 'No reliable data',
+    green: 'OK',
+  } satisfies Record<Level, string>,
+
+  /** for the small summary tiles */
+  levelShort: {
+    red: 'Too warm',
+    was_red: 'Was too warm',
     orange: 'Watch',
     grey: 'No reliable data',
     green: 'OK',

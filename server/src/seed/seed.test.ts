@@ -59,9 +59,9 @@ describe('seed: files', () => {
 });
 
 describe('seed: every story shows the status it was written for', () => {
-  it('Rishon / Cream cakes: the email rise continues to 7.4, fixed by 08:15: red (sustained)', () => {
-    expect(row('Rishon LeZion / Cream cakes')).toMatchObject({ level: 'red', firstAbove: '2026-09-14T06:15' });
-    expect(row('Rishon LeZion / Cream cakes').reasons).toContain('red:sustained');
+  it('Rishon / Cream cakes: the email rise continues to 7.4, fixed by 08:15: was too warm (sustained, ended, D36)', () => {
+    expect(row('Rishon LeZion / Cream cakes')).toMatchObject({ level: 'was_red', firstAbove: '2026-09-14T06:15' });
+    expect(row('Rishon LeZion / Cream cakes').reasons).toContain('was_red:sustained');
     const peak = db.prepare("SELECT MAX(temp_c) AS p FROM measurements WHERE logger_id = 'TL-0388' AND ts LIKE '2026-09-14%'").get() as { p: number };
     expect(peak.p).toBe(7.4);
   });
