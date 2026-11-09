@@ -45,6 +45,19 @@ describe('import preview (stateless, D16)', () => {
     expect(p.blocking).toHaveLength(4);
   });
 
+  it('a logger moving to another fridge is a move, not a gap; a real gap in one fridge stays a gap', () => {
+    const p = previewImport(db, [EMAIL]);
+    const logger = (id: string) => p.loggers.find((l) => l.loggerId === id)!;
+
+    // TL-0417: Walk-in until 14 Sep 06:30, then Display 2 from 17 Sep 06:00 (logger moved)
+    expect(logger('TL-0417').gaps).toEqual([]);
+    expect(logger('TL-0417').moves).toEqual([{ at: '2026-09-17T06:00', from: 'Tel Aviv / Walk-in', to: 'Tel Aviv / Display 2' }]);
+
+    // TL-0512 stays in Jerusalem / Dairy: 06:15 -> 08:30 is the 2h15m gap (D5)
+    expect(logger('TL-0512').gaps).toEqual([{ from: '2026-09-14T06:15', to: '2026-09-14T08:30', minutes: 135 }]);
+    expect(logger('TL-0512').moves).toEqual([]);
+  });
+
   it('writes nothing, even with every decision supplied', () => {
     const before = snapshot(db);
     const p = previewImport(db, [EMAIL], EMAIL_UNITS);

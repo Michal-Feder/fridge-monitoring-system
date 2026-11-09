@@ -33,4 +33,6 @@ export function fmtDuration(minutes: number): string {
 
 // non-breaking space: "°C" must never wrap onto a line by itself
 export const fmtTemp = (c: number | null | undefined) => (c === null || c === undefined ? '—' : `${c.toFixed(1)} °C`);
+/** Sentences written by the server ("≈ 3.3 °C") get the same non-breaking space before the unit. */
+export const keepUnits = (text: string) => text.replace(/(\d) °([CF])/g, '$1 °$2');
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;

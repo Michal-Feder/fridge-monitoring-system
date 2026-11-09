@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { dedupe, markConflicts, type Keyed } from './dedupe.ts';
-import { typicalInterval, findGaps } from './gaps.ts';
+import { typicalInterval, findGaps, fridgeRuns, fridgeMoves } from './gaps.ts';
 import { findExcursions, type SeriesPoint } from './events.ts';
 import { evaluateTrend, firstWarning } from './trend.ts';
 import { analyzeFridge, type Reading } from './analyze.ts';
@@ -57,6 +57,23 @@ describe('gaps', () => {
     const times = [0, 60, 120, 180, 240].map((x) => m('2026-09-14T00:00') + x);
     expect(typicalInterval(times)).toBe(60);
     expect(findGaps(times)).toHaveLength(0);
+  });
+
+  it('splits a logger series where the fridge changes: the delta across a move is not a gap (D38)', () => {
+    const pts = [
+      ['2026-09-17T06:00', 'Display 2'],
+      ['2026-09-14T06:00', 'Walk-in'],
+      ['2026-09-14T06:15', 'Walk-in'],
+      ['2026-09-17T06:15', 'Display 2'],
+      ['2026-09-18T06:00', 'Walk-in'], // moved back: a second move, still no gap
+    ].map(([ts, fridge]) => ({ t: m(ts), fridge }));
+    const runs = fridgeRuns(pts);
+    expect(runs.map((r) => [r.fridge, r.times.length])).toEqual([['Walk-in', 2], ['Display 2', 2], ['Walk-in', 1]]);
+    expect(runs.flatMap((r) => findGaps(r.times, 15))).toEqual([]);
+    expect(fridgeMoves(runs)).toEqual([
+      { atMin: m('2026-09-17T06:00'), from: 'Walk-in', to: 'Display 2' },
+      { atMin: m('2026-09-18T06:00'), from: 'Display 2', to: 'Walk-in' },
+    ]);
   });
 });
 

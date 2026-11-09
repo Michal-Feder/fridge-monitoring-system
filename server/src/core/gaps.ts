@@ -39,6 +39,31 @@ export function findGaps(timesMin: number[], typical: number | null = typicalInt
   return gaps;
 }
 
+export interface FridgeRun<F> {
+  fridge: F;
+  /** sorted reading times in this fridge, until the logger went elsewhere */
+  times: number[];
+}
+
+/**
+ * D38: one logger's readings split into consecutive runs per fridge, in time order. Gaps are looked for
+ * inside a run only: the delta across a fridge change is a move (the logger was taken out), not a gap.
+ */
+export function fridgeRuns<F>(points: { t: number; fridge: F }[]): FridgeRun<F>[] {
+  const runs: FridgeRun<F>[] = [];
+  for (const p of [...points].sort((a, b) => a.t - b.t)) {
+    const last = runs.at(-1);
+    if (last && last.fridge === p.fridge) last.times.push(p.t);
+    else runs.push({ fridge: p.fridge, times: [p.t] });
+  }
+  return runs;
+}
+
+/** Where the logger moved: the first reading in each new fridge. */
+export function fridgeMoves<F>(runs: FridgeRun<F>[]): { atMin: number; from: F; to: F }[] {
+  return runs.slice(1).map((r, i) => ({ atMin: r.times[0], from: runs[i].fridge, to: r.fridge }));
+}
+
 /**
  * Gaps in a fridge's series, which can come from several loggers over time (a logger was moved).
  * Each delta is judged against the typical interval of the logger that took the later reading.

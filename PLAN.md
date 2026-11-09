@@ -12,7 +12,7 @@
 - [x] search - [x] PATCH fridge - [x] CRUD-lite
 
 ## D client
-- [ ] dashboard - [ ] upload + preview - [ ] fridge chart - [ ] inspector report + print - [ ] search - [ ] setup - [ ] check at 375px
+- [x] dashboard - [x] upload + preview - [ ] fridge chart - [ ] inspector report + print - [ ] search - [ ] setup - [ ] check at 375px
 
 ## E docs
 - [ ] README from clean clone - [ ] NOTES.md - [ ] DECISIONS / AI_LOG up to date

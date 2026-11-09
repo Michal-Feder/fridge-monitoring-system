@@ -9,7 +9,7 @@ import { canonicalize, nameKey, cleanName, normalizeLoggerId, looksLikeLoggerId 
 import { suggestUnit, toCelsius, type Unit, type UnitSuggestion } from '../core/units.ts';
 import { rowKey, markConflicts } from '../core/dedupe.ts';
 import { valueKey } from '../core/parseTemp.ts';
-import { typicalInterval, findGaps } from '../core/gaps.ts';
+import { typicalInterval, findGaps, fridgeRuns, fridgeMoves } from '../core/gaps.ts';
 import { fridgeAt, changePointsFromRows, rebuildAssignments, sameAssignments } from '../core/assignments.ts';
 import { toMinutes, fromMinutes } from '../core/time.ts';
 
@@ -34,7 +34,10 @@ export interface LoggerSummary {
   /** D28: a confirmed logger whose new values look like the other unit */
   unitWarning: string | null;
   typicalInterval: number | null;
+  /** gaps inside one fridge; a fridge change is a move, not a gap (D38) */
   gaps: { from: string; to: string; minutes: number }[];
+  /** the logger's first reading in another fridge ("Branch / Fridge" labels) */
+  moves: { at: string; from: string; to: string }[];
   fridges: string[];
 }
 
@@ -241,6 +244,8 @@ function plan(db: Db, files: UploadFile[], decisions: Decisions = {}): Plan {
     units.set(loggerId, { unit, decided: !!decided || confirmed });
     const times = list.map((r) => toMinutes(r.ts));
     const typical = typicalInterval(times);
+    // D38: gaps per fridge run; the jump between two fridges is reported as a move
+    const runs = fridgeRuns(list.map((r) => ({ t: toMinutes(r.ts), fridge: `${r.branch} / ${r.fridge}` })));
     loggerSummaries.push({
       loggerId,
       known: !!known,
@@ -256,7 +261,8 @@ function plan(db: Db, files: UploadFile[], decisions: Decisions = {}): Plan {
           ? `${loggerId} is set to °${known!.unit}, but these values look like °${suggestion.unit}. Was the logger swapped? Nothing was changed.`
           : null,
       typicalInterval: typical,
-      gaps: findGaps(times, typical).map((g) => ({ from: fromMinutes(g.fromMin), to: fromMinutes(g.toMin), minutes: g.minutes })),
+      gaps: runs.flatMap((run) => findGaps(run.times, typical)).map((g) => ({ from: fromMinutes(g.fromMin), to: fromMinutes(g.toMin), minutes: g.minutes })),
+      moves: fridgeMoves(runs).map((mv) => ({ at: fromMinutes(mv.atMin), from: mv.from, to: mv.to })),
       fridges: [...new Set(list.map((r) => `${r.branch} / ${r.fridge}`))],
     });
   }
