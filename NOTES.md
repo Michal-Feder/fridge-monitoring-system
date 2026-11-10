@@ -1,7 +1,7 @@
 # Notes
 
 ## Time spent
-About 12 hours: planning ~3 h, building with AI ~5 h, checking the app and fixing ~4 h.
+About 13 hours: planning ~3 h, building with AI ~5 h, checking the app and fixing ~5 h.
 
 ## How I worked
 - I planned with three AI tools (Gemini, GPT, Claude) and wrote the plan in INIT.md.
