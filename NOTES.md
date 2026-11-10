@@ -40,8 +40,15 @@ About 12 hours: planning ~3 h, building with AI ~5 h, checking the app and fixin
 - Next hour: show on the dashboard what changed since the last upload.
 - Not done: email/SMS alerts, a "too cold" check,
   marking a problem as handled, deleting data, automated tests for the screens.
-- Known limits: pasting a corrected file again does not move readings already saved. When one time has two
-  values, the higher one is used.
+- Known limits:
+  - Fixing a fridge name and pasting the file again is blocked with an explanation, because saved readings can't
+    be moved yet. A first-time typo in a fridge name (shown as 'will create' in the preview) creates a fridge that
+    cannot be deleted or merged yet. Next step: let the user move saved readings to another fridge by an explicit
+    choice for a chosen period, never automatically (a logger can move while its old readings must stay where they
+    were measured).
+  - 'Now' is the latest reading in the system, not per branch, so a branch whose file ends earlier can show as
+    'no recent data'.
+  - When one time has two values, the higher one is used.
 
 ## AI: one thing it got wrong
 While planning, Gemini said the Haifa numbers (38.3, 39.0) were "10 times too high" and should

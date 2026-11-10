@@ -88,6 +88,9 @@ export function UploadPage() {
   // a logger whose values fit no unit is shown even when its unit was confirmed earlier: it blocks saving (D42)
   const unitLoggers = preview?.loggers.filter((l) => l.needsUnitDecision || l.suggestion.unit === null) ?? [];
   const assignFiles = preview?.files.filter((f) => f.ok && f.raw && (f.raw.needsAssignment || f.raw.fridgeSource === 'decision')) ?? [];
+  // what blocks saving and has no decision card of its own, e.g. saved rows under another fridge (D51): shown as text
+  const covered = [...unitLoggers.map((l) => `${l.loggerId}: `), ...assignFiles.map((f) => `${f.name}: `)];
+  const otherBlocking = preview?.blocking.filter((b) => !covered.some((c) => b.startsWith(c))) ?? [];
   // the preview shown belongs to the current files only when it lists exactly them
   const current = preview !== null && preview.files.length === files.length && files.every((f) => preview.files.some((p) => p.name === f.name));
 
@@ -125,6 +128,18 @@ export function UploadPage() {
             </section>
           )}
 
+          {otherBlocking.length > 0 && (
+            <section>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">{s.cannotSave}</h3>
+              <ul className="mt-2 space-y-1.5">
+                {otherBlocking.map((b) => (
+                  <li key={b} className="break-words rounded-lg border-2 border-red-400 bg-red-50 p-2 text-sm text-red-900" role="alert">
+                    {b}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           <Checks preview={preview} />
           <FilesAndLoggers preview={preview} />
 

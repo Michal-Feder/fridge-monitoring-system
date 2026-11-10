@@ -154,6 +154,7 @@ export const strings = {
     totalsHint: 'Error readings are kept and shown as errors, never as 0. Duplicates are counted, not saved twice.',
 
     decide: 'Your decision is needed',
+    cannotSave: 'Cannot be saved yet',
     decideNone: 'Nothing to decide.',
     unitTitle: (id: string) => `Unit for ${id}`,
     newLogger: 'new logger',

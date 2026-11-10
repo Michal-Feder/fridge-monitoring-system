@@ -64,7 +64,7 @@ Everything below is in the seeded data. "Now" is the latest reading uploaded (20
 5. **Setup**: add a fridge, move a logger, change a logger's unit (all its readings are recomputed from the originals).
 
 ## Docs
-- `DECISIONS.md`: every rule and why (D1-D50), including the questions for Summer.
+- `DECISIONS.md`: every rule and why (D1-D51), including the questions for Summer.
 - `NOTES.md`: time spent, decisions Summer did not ask for, open questions, what is not done, AI mistakes.
 - `AI_LOG.md`: every AI suggestion that was wrong or rejected, and how it was caught.
 - `INIT.md` / `PLAN.md`: the build spec and checklist. `CLAUDE.md`: rules for AI tools in this repo.

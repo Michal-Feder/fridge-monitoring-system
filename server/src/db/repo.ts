@@ -73,8 +73,9 @@ export function insertMeasurements(db: Db, rows: NewMeasurement[], importId: num
   return n;
 }
 
-export function existingKeys(db: Db, loggerId: string, from: string, to: string): MeasurementRow[] {
-  return all<MeasurementRow>(db, 'SELECT logger_id, ts, original_value, original_unit, value_key, temp_c, status FROM measurements WHERE logger_id = ? AND ts BETWEEN ? AND ?', loggerId, from, to);
+/** Saved readings of a logger in a time range, with the fridge each one is saved under (D51). */
+export function existingKeys(db: Db, loggerId: string, from: string, to: string): (MeasurementRow & { fridge_id: number })[] {
+  return all<MeasurementRow & { fridge_id: number }>(db, 'SELECT logger_id, ts, original_value, original_unit, value_key, temp_c, status, fridge_id FROM measurements WHERE logger_id = ? AND ts BETWEEN ? AND ?', loggerId, from, to);
 }
 
 export function measurementsAt(db: Db, loggerId: string, ts: string): (MeasurementRow & { id: number })[] {

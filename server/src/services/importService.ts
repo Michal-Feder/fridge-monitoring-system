@@ -229,10 +229,13 @@ function plan(db: Db, files: UploadFile[], decisions: Decisions = {}): Plan {
   // --- duplicates within the batch, rows already in the DB, conflicts (D14)
   const seen = new Set<string>();
   const rows: PlannedRow[] = [];
+  // D51: saved rows that the file puts in another fridge (counted per file / saved fridge / file fridge)
+  const misplaced = new Map<string, { file: string; saved: string; inFile: string; rows: number }>();
   for (const [loggerId, list] of byLogger) {
     const tsSorted = list.map((r) => r.ts).sort();
     const existing = repo.existingKeys(db, loggerId, tsSorted[0], tsSorted[tsSorted.length - 1]);
     const dbKeys = new Set(existing.map((e) => `${e.logger_id}|${e.ts}|${e.value_key}`));
+    const savedFridge = new Map(existing.map((e) => [`${e.logger_id}|${e.ts}|${e.value_key}`, e.fridge_id]));
     const dbNumbersAt = new Map<string, Set<number>>();
     for (const e of existing) if (e.temp_c !== null) {
       const v = Number(e.value_key);
@@ -248,6 +251,17 @@ function plan(db: Db, files: UploadFile[], decisions: Decisions = {}): Plan {
       const inDb = !duplicate && dbKeys.has(key);
       const numbers = new Set([...(batchNumbersAt.get(r.ts) ?? []), ...(dbNumbersAt.get(r.ts) ?? [])]);
       rows.push({ ...r, key, duplicate, inDb, conflict: r.value !== null && numbers.size > 1 });
+      if (inDb) {
+        const f = fridgeById.get(savedFridge.get(key)!);
+        if (f && (nameKey(f.branch) !== nameKey(r.branch) || nameKey(f.name) !== nameKey(r.fridge))) {
+          const saved = `${f.branch} / ${f.name}`;
+          const inFile = `${r.branch} / ${r.fridge}`;
+          const k = `${r.file}|${saved}|${inFile}`;
+          const m = misplaced.get(k) ?? { file: r.file, saved, inFile, rows: 0 };
+          m.rows++;
+          misplaced.set(k, m);
+        }
+      }
     }
 
     const known = knownLoggers.get(loggerId);
@@ -299,6 +313,10 @@ function plan(db: Db, files: UploadFile[], decisions: Decisions = {}): Plan {
     .sort();
 
   const blocking: string[] = [];
+  // D51: block, never move: saved readings stay where they were measured (an explicit move is a later feature)
+  for (const m of misplaced.values()) {
+    blocking.push(`${m.rows} row${m.rows === 1 ? '' : 's'} in ${m.file} ${m.rows === 1 ? 'is' : 'are'} already saved under ${m.saved}, but the file says ${m.inFile}. Saved readings can't be moved yet. Change the name back in the file, or remove these rows.`);
+  }
   for (const s of summaries) if (s.raw?.needsAssignment) blocking.push(`${s.name}: choose ${s.raw.loggerId ? '' : 'the logger id, '}branch and fridge.`);
   for (const l of loggerSummaries) {
     // D42: values that fit neither unit block saving even when a unit was chosen or confirmed before

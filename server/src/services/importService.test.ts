@@ -131,6 +131,36 @@ describe('import confirm', () => {
     });
   });
 
+  describe('re-pasting saved rows under another fridge is blocked, never moved (D51)', () => {
+    it('Jerusalem "Dairy" -> "Cheese" on rows already saved: preview blocks, confirm saves nothing', () => {
+      confirmImport(db, [EMAIL], EMAIL_UNITS, NOW);
+      const before = snapshot(db);
+      const renamed: UploadFile = { name: 'email-cheese.tsv', text: EMAIL_SAMPLE_TSV.replace(/Jerusalem\tDairy/g, 'Jerusalem\tCheese') };
+      const p = previewImport(db, [renamed]);
+      expect(p.canConfirm).toBe(false);
+      expect(p.blocking).toContain(
+        "3 rows in email-cheese.tsv are already saved under Jerusalem / Dairy, but the file says Jerusalem / Cheese. Saved readings can't be moved yet. Change the name back in the file, or remove these rows.",
+      );
+      expect(confirmImport(db, [renamed], {}, NOW).ok).toBe(false);
+      expect(snapshot(db)).toEqual(before); // no reading moved, no history change, no empty "Cheese" fridge
+    });
+
+    it('a real logger move still works: new TL-0417 rows after 17 Sep go to Display 2, Walk-in readings stay', () => {
+      confirmImport(db, [EMAIL], EMAIL_UNITS, NOW);
+      const later: UploadFile = {
+        name: 'week38.tsv',
+        // the 17 Sep 06:00 row is already saved under Display 2 (same fridge: fine), the other two are new
+        text: 'Logger\tBranch\tFridge\tTime\tTemp\nTL-0417\tTel Aviv\tDisplay 2\t2026-09-17 06:00\t3.7\nTL-0417\tTel Aviv\tDisplay 2\t2026-09-17 06:15\t3.8\nTL-0417\tTel Aviv\tDisplay 2\t2026-09-18 06:00\t3.6\n',
+      };
+      const p = previewImport(db, [later]);
+      expect(p).toMatchObject({ canConfirm: true, blocking: [], totals: { newRows: 2, alreadyInDb: 1 } });
+      expect(confirmImport(db, [later], {}, NOW)).toMatchObject({ ok: true, newRows: 2 });
+      const fridgeOf = (ts: string) =>
+        (db.prepare('SELECT f.name AS name FROM measurements m JOIN fridges f ON f.id = m.fridge_id WHERE m.logger_id = ? AND m.ts = ?').get('TL-0417', ts) as { name: string }).name;
+      expect(['2026-09-14T06:00', '2026-09-14T06:30', '2026-09-17T06:15', '2026-09-18T06:00'].map(fridgeOf)).toEqual(['Walk-in', 'Walk-in', 'Display 2', 'Display 2']);
+    });
+  });
+
   it('is idempotent: confirming the same file again leaves an identical DB', () => {
     confirmImport(db, [EMAIL], EMAIL_UNITS, NOW);
     const first = snapshot(db);
