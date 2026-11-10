@@ -37,7 +37,8 @@ About 12 hours: planning ~3 h, building with AI ~5 h, checking the app and fixin
 5. Who should be told when something is wrong, and how fast?
 
 ## Not done / next hour
-- Next hour: show on the dashboard what changed since the last upload.
+- Next hour: Warn in the upload preview when a new fridge name is close to an existing one (e.g. 'Diary' next to
+  'Dairy'), to stop typo fridges before they are created.
 - Not done: email/SMS alerts, a "too cold" check,
   marking a problem as handled, deleting data, automated tests for the screens.
 - Known limits:
@@ -61,4 +62,4 @@ miss. I converted by hand: 38.3 °F is 3.5 °C. It is Fahrenheit.
 
 Other AI mistakes I caught are in AI_LOG.md: the AI changed the agreed stack because its own
 sandbox could not install packages; tests showed two rules were wrong; I found three problems
-by using the app (D36, D38, D40); a separate AI code review found more: D44, D45, D48, D49.
+by using the app (D36, D38, D40); a separate AI code review found more: D44, D45, D48, D49, D51.
